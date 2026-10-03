@@ -1,0 +1,14 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# CDK
+cdk.out/
+
+# Secrets and local settings
+.env
+
+# OS / editor
+.DS_Store
+.vscode/
