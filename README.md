@@ -41,12 +41,12 @@ Not affiliated with the City of Hamilton or the HSR.
 
 ## Roadmap
 
-### 🚧 v0.1: Live data collection
+### ✅ v0.1: Live data collection
 - [x] Fetch live HSR trip updates every minute (Lambda + EventBridge)
 - [x] Save raw feed snapshots to S3
-- [ ] Load the static HSR schedule (routes, stops, scheduled times)
+- [x] Load the static HSR schedule (routes, stops, scheduled times)
 
-### v0.2: Delay tracking
+### v0.2: Delay tracking (in progress)
 - [ ] Match live trips to their scheduled trips
 - [ ] Calculate how late each bus is at each stop
 - [ ] Classify arrivals as early, on time, or late (city definition: max 2 min early, 5 min late)
