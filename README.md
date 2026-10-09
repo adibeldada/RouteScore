@@ -42,7 +42,7 @@ Not affiliated with the City of Hamilton or the HSR.
 ## Roadmap
 
 ### 🚧 v0.1: Live data collection
-- [ ] Fetch live HSR trip updates every minute (Lambda + EventBridge)
+- [x] Fetch live HSR trip updates every minute (Lambda + EventBridge)
 - [ ] Save raw feed snapshots to S3
 - [ ] Load the static HSR schedule (routes, stops, scheduled times)
 
