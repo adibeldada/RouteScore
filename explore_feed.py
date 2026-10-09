@@ -25,12 +25,26 @@ feed_message.ParseFromString(response.content)
 # Loop over every upcoming stop of the first trip in the feed.
 # Each stop has arrival.time (predicted, or actual if already passed)
 # and arrival.scheduled_time (when it's supposed to arrive), both in Unix seconds.
-for stop in feed_message.entity[0].trip_update.stop_time_update:
-    arrival_time = stop.arrival.time
-    scheduled_time = stop.arrival.scheduled_time
-    offset = arrival_time - scheduled_time        # positive = late, negative = early (seconds)
-    print(f"Stop {stop.stop_id} (seq {stop.stop_sequence}): offset {offset} s")
+for entity in feed_message.entity[:3]:
+    route = entity.trip_update.trip.route_id
+    trip_id = entity.trip_update.trip.trip_id
+    print(f"\nRoute {route} | Trip {trip_id}")
 
+    for stop in entity.trip_update.stop_time_update:
+        arrival_time = stop.arrival.time
+        scheduled_time = stop.arrival.scheduled_time
+        offset = arrival_time - scheduled_time    # positive = late, negative = early (seconds)
+
+        if offset < -120:
+            early_late = "early"
+        elif offset > 300:
+            early_late = "late"
+        else:
+            early_late = "on time"
+
+        print(f"  Stop {stop.stop_id} (seq {stop.stop_sequence}): offset {offset} s -> {early_late}")
+
+    
 # --- Summary of the first 5 trips ---
 i = 1
 for entity in feed_message.entity[:5] :
