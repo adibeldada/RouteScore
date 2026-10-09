@@ -4,8 +4,13 @@ AWS Lambda entry point for RouteScore.
 Fetches Hamilton's live HSR trip updates feed.
 """
 
-import requests
-from google.transit import gtfs_realtime_pb2
+import gzip                                       # compress the feed before saving
+import os                                         # read environment variables (BUCKET_NAME)
+from datetime import datetime, timezone           # turn the Unix timestamp into a date for the filename
+
+import boto3                                      # AWS SDK for Python (talk to S3)
+import requests                                   # download the feed over HTTP
+from google.transit import gtfs_realtime_pb2      # decode GTFS-Realtime (protobuf) data
 
 # City of Hamilton's live trip updates feed (binary protobuf, not JSON)
 FEED_URL = "https://opendata.hamilton.ca/GTFS-RT/GTFS_TripUpdates.pb"
@@ -24,7 +29,28 @@ def fetch_feed():
 def lambda_handler(event, context):
     """Called by AWS on each run. event/context are passed in by AWS (unused for now)."""
     feed = fetch_feed()
+    save_snapshot(feed)
     print(f"Trips in feed: {len(feed.entity)}")
+
+def save_snapshot(feed):
+    """Compress the feed and upload it to S3."""
+    bucket_name = os.environ.get("BUCKET_NAME")
+
+    if bucket_name is None :
+        print("BUCKET_NAME not set, skipping save")
+        return
+    
+    raw_bytes = feed.SerializeToString()
+    compressed_bytes = gzip.compress(raw_bytes)
+
+    key = datetime.fromtimestamp(feed.header.timestamp, tz=timezone.utc).strftime("raw/%Y/%m/%d/%H%M%S.pb.gz")
+
+    s3 = boto3.client("s3")
+
+    s3.put_object(Bucket=bucket_name, Key=key, Body=compressed_bytes)
+
+    print(f"Saved {key}")
+
 
 
 # Only runs when executed directly (python handler.py), not when AWS imports the file

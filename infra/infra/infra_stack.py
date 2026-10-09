@@ -5,6 +5,7 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_events as events,
     aws_events_targets as targets,
+    aws_s3 as s3,
 )
 from constructs import Construct
 
@@ -14,6 +15,20 @@ class InfraStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
+        # --- STORAGE ---
+        # S3 bucket: cloud storage for every raw feed snapshot.
+        # It's just an empty "folder" — handler.py is what puts files in it.
+        # Files are auto-deleted after 90 days to keep costs down.
+        bucket = s3.Bucket(
+            self, "RawFeedBucket",
+            lifecycle_rules=[
+                s3.LifecycleRule(expiration=Duration.days(90)),
+            ],
+        )
+
+        # --- THE CODE ---
+        # Lambda: runs src/handler.py (lambda_handler) in the cloud.
+        # Created after the bucket so it can be told the bucket's name.
         fetch_fn = _lambda.Function(
             self, "FetchFeedFunction",
             runtime=_lambda.Runtime.PYTHON_3_13,
@@ -30,11 +45,19 @@ class InfraStack(Stack):
             ),
             timeout=Duration.seconds(30),              # default is 3 s, too short
             memory_size=256,
+            environment={                              # values handler.py can read
+                "BUCKET_NAME": bucket.bucket_name,     # auto-generated name, passed in
+            },
         )
 
+        # --- PERMISSION ---
+        # Allow the Lambda to upload files into this bucket (and nothing else).
+        bucket.grant_put(fetch_fn)
+
+        # --- THE TIMER ---
+        # EventBridge rule: calls the Lambda every 1 minute.
         rule = events.Rule(
             self, "EveryMinute",
             schedule=events.Schedule.rate(Duration.minutes(1)),
             targets=[targets.LambdaFunction(fetch_fn)],
         )
-        
