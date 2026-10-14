@@ -44,19 +44,20 @@ Not affiliated with the City of Hamilton or the HSR.
 ### ✅ v0.1: Live data collection
 - [x] Fetch live HSR trip updates every minute (Lambda + EventBridge)
 - [x] Save raw feed snapshots to S3
-- [x] Load the static HSR schedule (routes, stops, scheduled times)
+- [x] Load route and stop names from the static schedule (routes.txt, stops.txt)
 
 ### v0.2: Delay tracking (in progress)
-- [ ] Match live trips to their scheduled trips
-- [ ] Calculate how late each bus is at each stop
-- [ ] Classify arrivals as early, on time, or late (city definition: max 2 min early, 5 min late)
-- [ ] Store results in DynamoDB
+- [x] Find each bus's final arrival at each stop from saved snapshots
+- [x] Calculate how late each bus is at each stop
+- [x] Classify arrivals as early, on time, or late (city definition: max 2 min early, 5 min late)
+- [ ] Run hourly as a batch Lambda and save results to S3
 
 ### v0.3: Reliability stats
 - [ ] On-time % per route
 - [ ] On-time % per stop
 - [ ] On-time % by hour of day (e.g. rush hour vs. evening)
 - [ ] Daily summaries so stats build up over time
+- [ ] Store on-time % totals in DynamoDB
 
 ### v0.4: Public dashboard
 - [ ] Route leaderboard: most and least reliable routes
@@ -70,6 +71,7 @@ Not affiliated with the City of Hamilton or the HSR.
 - [ ] Automatic deployment with AWS CDK
 
 ### v0.6: Ghost buses
+- [ ] Load scheduled trips from the static schedule (stop_times.txt, trips.txt)
 - [ ] Detect scheduled trips that never appeared
 - [ ] Ghost bus count per route on the dashboard
 
@@ -81,6 +83,7 @@ Not affiliated with the City of Hamilton or the HSR.
 - [ ] Queue between fetching and processing (SQS), so one failing doesn't break the other
 - [ ] Retry failed processing and capture bad data (dead-letter queue)
 - [ ] Detect feed outages and mark gaps clearly instead of skewing stats
+- [ ] Handle known feed quirks: duplicate trips, placeholder zero offsets
 
 ### v0.9: Rider experience
 - [ ] Mobile-friendly dashboard
@@ -95,6 +98,7 @@ Not affiliated with the City of Hamilton or the HSR.
 - [ ] Runs within AWS free usage limits
 
 ### Future ideas
+- [ ] Auto-download the latest static schedule daily (Lambda + S3)
 - [ ] Delay prediction from historical data
 - [ ] Weather impact on delays
 - [ ] Weekly reliability report by email
