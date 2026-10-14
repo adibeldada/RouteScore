@@ -5,21 +5,47 @@ Turns saved feed snapshots into final arrival records (one per bus per stop).
 
 import gzip                                       # decompress the saved snapshots
 import os                                         # list the files in a folder
-import boto3                                      # AWS SDK for Python (talk to S3)
 
+import boto3                                      # AWS SDK for Python (talk to S3)
 from google.transit import gtfs_realtime_pb2      # decode GTFS-Realtime (protobuf) data
 
+# Created once when the file loads, then reused (faster on warm Lambda runs)
+s3 = boto3.client("s3")
 
-def read_snapshot(path):
-    """Read one saved .pb.gz snapshot and return it as a FeedMessage."""
-    with open(path, "rb") as f:
-        data = f.read()
 
+def parse_snapshot(data):
+    """Decompress + parse one snapshot's bytes into a FeedMessage."""
     decompressed_bytes = gzip.decompress(data)
 
     feed_message = gtfs_realtime_pb2.FeedMessage()
     feed_message.ParseFromString(decompressed_bytes)
     return feed_message
+
+
+def read_snapshot(path):
+    """Read one saved .pb.gz snapshot from a local file and return it as a FeedMessage."""
+    with open(path, "rb") as f:
+        data = f.read()
+
+    return parse_snapshot(data)
+
+
+def load_feeds_from_s3(bucket_name, prefix):
+    """Download every snapshot under a prefix (oldest first) and return them as feeds."""
+    response = s3.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+
+    keys = []
+    for item in response.get("Contents", []):    # each item = one file's info
+        keys.append(item["Key"])                  # we only need its name (key)
+    keys.sort()                                    # oldest first (keys are time-named)
+
+    feeds = []
+    for key in keys:
+        obj = s3.get_object(Bucket=bucket_name, Key=key)
+        data = obj["Body"].read()                  # the file's bytes, like f.read()
+        feeds.append(parse_snapshot(data))
+
+    return feeds
 
 
 def classify(offset):
@@ -72,37 +98,47 @@ def find_final_arrivals(feeds):
     return results
 
 
-# Only runs when executed directly, not when imported (e.g. by the Lambda later)
-if __name__ == "__main__":
-    # Load all snapshots, oldest first (file names are times, so sorting = time order)
-    snapshot_names = sorted(os.listdir("snapshots"))
-    feeds = []
-    for snapshot_name in snapshot_names:
-        feeds.append(read_snapshot(os.path.join("snapshots", snapshot_name)))
-    print(f"Loaded {len(feeds)} snapshots")
-
-    final = find_final_arrivals(feeds)
-    print(f"Final arrivals: {len(final)}")
-
-    # Peek at the first 5 records
-    for key, value in list(final.items())[:5]:
-        print(key, value)
-
+def summarize(final):
+    """Print how many arrivals were early / on time / late."""
     early_counter = 0
     on_time_counter = 0
     late_counter = 0
 
-    for values in final.values():
-        if (values["status"] == "early"):
+    for value in final.values():
+        if value["status"] == "early":
             early_counter += 1
-        if (values["status"] == "on time"):
+        elif value["status"] == "on time":
             on_time_counter += 1
-        if (values["status"] == "late"):
+        elif value["status"] == "late":
             late_counter += 1
-    
+
     total = len(final)
     print(f"\nResults ({total} arrivals):")
     print(f"early:   {early_counter} ({early_counter / total * 100:.1f}%)")
     print(f"on time: {on_time_counter} ({on_time_counter / total * 100:.1f}%)")
     print(f"late:    {late_counter} ({late_counter / total * 100:.1f}%)")
-            
+
+
+# Only runs when executed directly, not when imported (e.g. by the Lambda later)
+if __name__ == "__main__":
+    # --- Test 1: local snapshots ---
+    snapshot_names = sorted(os.listdir("snapshots"))
+    feeds = []
+    for snapshot_name in snapshot_names:
+        feeds.append(read_snapshot(os.path.join("snapshots", snapshot_name)))
+    print(f"Loaded {len(feeds)} local snapshots")
+
+    final = find_final_arrivals(feeds)
+    print(f"Final arrivals: {len(final)}")
+    summarize(final)
+
+    # --- Test 2: the same kind of data, straight from S3 (10 files: 21:00-21:09 UTC) ---
+    s3_feeds = load_feeds_from_s3(
+        "routescorestack-rawfeedbucket504cf208-nsj9oprvyysm",
+        "raw/2026/10/09/210",
+    )
+    print(f"\nLoaded {len(s3_feeds)} snapshots from S3")
+
+    s3_final = find_final_arrivals(s3_feeds)
+    print(f"Final arrivals: {len(s3_final)}")
+    summarize(s3_final)
