@@ -46,11 +46,11 @@ Not affiliated with the City of Hamilton or the HSR.
 - [x] Save raw feed snapshots to S3
 - [x] Load route and stop names from the static schedule (routes.txt, stops.txt)
 
-### v0.2: Delay tracking (in progress)
+### ✅ v0.2: Delay tracking (in progress)
 - [x] Find each bus's final arrival at each stop from saved snapshots
 - [x] Calculate how late each bus is at each stop
 - [x] Classify arrivals as early, on time, or late (city definition: max 2 min early, 5 min late)
-- [ ] Run hourly as a batch Lambda and save results to S3
+- [x] Run hourly as a batch Lambda and save results to S3
 
 ### v0.3: Reliability stats
 - [ ] On-time % per route

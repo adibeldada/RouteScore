@@ -4,6 +4,7 @@ Turns saved feed snapshots into final arrival records (one per bus per stop).
 """
 
 import gzip                                       # decompress the saved snapshots
+import json                                       # save results as JSON Lines
 import os                                         # list the files in a folder
 
 import boto3                                      # AWS SDK for Python (talk to S3)
@@ -119,8 +120,33 @@ def summarize(final):
     print(f"late:    {late_counter} ({late_counter / total * 100:.1f}%)")
 
 
+def save_arrivals(bucket_name, key, final):
+    """Save final arrivals to S3 as gzipped JSON Lines (one arrival per line)."""
+    lines = []
+    for (trip_id, stop_sequence), value in final.items():   # unpack the tuple key right in the loop
+        record = {
+            "trip_id": trip_id,
+            "stop_sequence": stop_sequence,
+            "route_id": value["route_id"],
+            "stop_id": value["stop_id"],
+            "time": value["time"],
+            "scheduled_time": value["scheduled_time"],
+            "offset": value["offset"],
+            "status": value["status"],
+        }
+        lines.append(json.dumps(record))                    # dict -> one JSON string
+
+    body = "\n".join(lines).encode("utf-8")                 # one string -> bytes
+    compressed = gzip.compress(body)
+
+    s3.put_object(Bucket=bucket_name, Key=key, Body=compressed)
+    print(f"Saved {len(lines)} arrivals to {key}")
+
+
 # Only runs when executed directly, not when imported (e.g. by the Lambda later)
 if __name__ == "__main__":
+    BUCKET = "routescorestack-rawfeedbucket504cf208-nsj9oprvyysm"
+
     # --- Test 1: local snapshots ---
     snapshot_names = sorted(os.listdir("snapshots"))
     feeds = []
@@ -133,12 +159,12 @@ if __name__ == "__main__":
     summarize(final)
 
     # --- Test 2: the same kind of data, straight from S3 (10 files: 21:00-21:09 UTC) ---
-    s3_feeds = load_feeds_from_s3(
-        "routescorestack-rawfeedbucket504cf208-nsj9oprvyysm",
-        "raw/2026/10/09/210",
-    )
+    s3_feeds = load_feeds_from_s3(BUCKET, "raw/2026/10/09/210")
     print(f"\nLoaded {len(s3_feeds)} snapshots from S3")
 
     s3_final = find_final_arrivals(s3_feeds)
     print(f"Final arrivals: {len(s3_final)}")
     summarize(s3_final)
+
+    # --- Test 3: save the S3 results back to S3 as JSON Lines ---
+    save_arrivals(BUCKET, "arrivals/test.jsonl.gz", s3_final)
