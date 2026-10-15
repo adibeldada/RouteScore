@@ -16,8 +16,7 @@ class InfraStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         # --- STORAGE ---
-        # S3 bucket: cloud storage for every raw feed snapshot.
-        # It's just an empty "folder" — handler.py is what puts files in it.
+        # S3 bucket: raw/ = every minute's feed, arrivals/ = every hour's results.
         # Files are auto-deleted after 90 days to keep costs down.
         bucket = s3.Bucket(
             self, "RawFeedBucket",
@@ -26,38 +25,67 @@ class InfraStack(Stack):
             ],
         )
 
-        # --- THE CODE ---
-        # Lambda: runs src/handler.py (lambda_handler) in the cloud.
-        # Created after the bucket so it can be told the bucket's name.
+        # --- THE CODE (shared) ---
+        # Both Lambdas run code from the same src/ folder, so package it once.
+        # Installs src/requirements.txt inside a Lambda-like Docker container.
+        code = _lambda.Code.from_asset(
+            "../src",
+            bundling=BundlingOptions(
+                image=_lambda.Runtime.PYTHON_3_13.bundling_image,
+                command=[
+                    "bash", "-c",
+                    "pip install -r requirements.txt -t /asset-output && cp -r . /asset-output",
+                ],
+            ),
+        )
+
+        # --- LAMBDA 1: FETCH (every minute) ---
+        # Runs src/handler.py: downloads the live feed and saves it to raw/.
         fetch_fn = _lambda.Function(
             self, "FetchFeedFunction",
             runtime=_lambda.Runtime.PYTHON_3_13,
-            handler="handler.lambda_handler",          # file.function to call
-            code=_lambda.Code.from_asset(
-                "../src",                              # folder to upload (relative to infra/)
-                bundling=BundlingOptions(              # install src/requirements.txt in Docker
-                    image=_lambda.Runtime.PYTHON_3_13.bundling_image,
-                    command=[
-                        "bash", "-c",
-                        "pip install -r requirements.txt -t /asset-output && cp -r . /asset-output",
-                    ],
-                ),
-            ),
-            timeout=Duration.seconds(30),              # default is 3 s, too short
+            handler="handler.lambda_handler",
+            code=code,
+            timeout=Duration.seconds(30),
             memory_size=256,
-            environment={                              # values handler.py can read
-                "BUCKET_NAME": bucket.bucket_name,     # auto-generated name, passed in
+            environment={
+                "BUCKET_NAME": bucket.bucket_name,
             },
         )
 
-        # --- PERMISSION ---
-        # Allow the Lambda to upload files into this bucket (and nothing else).
+        # Fetch only needs to upload to the bucket.
         bucket.grant_put(fetch_fn)
 
-        # --- THE TIMER ---
-        # EventBridge rule: calls the Lambda every 1 minute.
+        # Timer: call the fetch Lambda every 1 minute.
         rule = events.Rule(
             self, "EveryMinute",
             schedule=events.Schedule.rate(Duration.minutes(1)),
             targets=[targets.LambdaFunction(fetch_fn)],
+        )
+
+        # --- LAMBDA 2: PROCESS (every hour) ---
+        # Runs src/process.py: reads the last hour from raw/, finds final arrivals,
+        # saves them to arrivals/.
+        process_fn = _lambda.Function(
+            self, "ProcessArrivalsFunction",
+            runtime=_lambda.Runtime.PYTHON_3_13,
+            handler="process.lambda_handler",
+            code=code,
+            timeout=Duration.minutes(5),               # ~60 files to download + process
+            memory_size=1024,                          # holds an hour of feeds in memory (more memory = faster too)
+            environment={
+                "BUCKET_NAME": bucket.bucket_name,
+            },
+        )
+
+        # Process needs to read raw/ and write arrivals/.
+        bucket.grant_read(process_fn)
+        bucket.grant_put(process_fn)
+
+        # Timer: call the process Lambda at 5 minutes past every hour
+        # (gives the last snapshot of the previous hour time to land first).
+        hourly_rule = events.Rule(
+            self, "EveryHour",
+            schedule=events.Schedule.cron(minute="5"),
+            targets=[targets.LambdaFunction(process_fn)],
         )
