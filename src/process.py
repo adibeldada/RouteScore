@@ -5,7 +5,8 @@ Turns saved feed snapshots into final arrival records (one per bus per stop).
 
 import gzip                                       # decompress the saved snapshots
 import json                                       # save results as JSON Lines
-import os                                         # list the files in a folder
+import os                                         # list folders / read environment variables
+from datetime import datetime, timedelta, timezone   # work out which hour to process
 
 import boto3                                      # AWS SDK for Python (talk to S3)
 from google.transit import gtfs_realtime_pb2      # decode GTFS-Realtime (protobuf) data
@@ -143,6 +144,45 @@ def save_arrivals(bucket_name, key, final):
     print(f"Saved {len(lines)} arrivals to {key}")
 
 
+def lambda_handler(event, context):
+    """Called by AWS every hour: process the hour that just ended."""
+
+    # The time exactly one hour ago, in UTC (the same time zone the snapshot files use).
+    # If it's 7:05pm UTC now, this is 6:05pm UTC, so we'll process the 6pm hour.
+    one_hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
+
+    # Where to READ from: the start of the file names for that hour.
+    # e.g. "raw/2026/10/15/18" = year/month/day/HOUR, so 18 = 18:00-18:59 UTC
+    # (UTC is 4 hours ahead of Toronto right now, so 18 UTC = 2:00-2:59pm Toronto).
+    # This matches every snapshot saved in that hour: ~60 files, one per minute.
+    prefix = one_hour_ago.strftime("raw/%Y/%m/%d/%H")
+
+    # Where to SAVE to: the file name for this hour's results.
+    # e.g. "arrivals/2026/10/15/18.jsonl.gz", one results file per hour.
+    key = one_hour_ago.strftime("arrivals/%Y/%m/%d/%H.jsonl.gz")
+
+    # Which S3 bucket to use. CDK gives the Lambda this name as a setting (an environment variable).
+    bucket_name = os.environ["BUCKET_NAME"]
+
+    # Step 1: download every snapshot from that hour (~60 files, one per minute), oldest first,
+    # and turn each one back into a feed we can read.
+    # 60 snapshots = 60 minutes, NOT 60 buses. Each snapshot has every bus (~600-800 trips).
+    feeds = load_feeds_from_s3(bucket_name, prefix)
+    print(f"Loaded {len(feeds)} snapshots from {prefix}")
+
+    # If there were no snapshots that hour (e.g. the fetch Lambda was down), there's nothing to do.
+    if not feeds:
+        print(f"No snapshots for {prefix}, skipping")
+        return
+
+    # Step 2: go through the snapshots and work out when each bus actually reached each stop,
+    # how late it was, and whether that's early / on time / late.
+    # e.g. the 18:00 UTC hour on Oct 15 gave 10,531 arrivals (each = one bus reaching one stop).
+    final = find_final_arrivals(feeds)
+
+    # Step 3: save those results to S3 as one file for this hour.
+    save_arrivals(bucket_name, key, final)
+
 # Only runs when executed directly, not when imported (e.g. by the Lambda later)
 if __name__ == "__main__":
     BUCKET = "routescorestack-rawfeedbucket504cf208-nsj9oprvyysm"
@@ -168,3 +208,6 @@ if __name__ == "__main__":
 
     # --- Test 3: save the S3 results back to S3 as JSON Lines ---
     save_arrivals(BUCKET, "arrivals/test.jsonl.gz", s3_final)
+
+    # --- Test 4: the real Lambda entry point (processes the last full hour) ---
+    lambda_handler(None, None)
