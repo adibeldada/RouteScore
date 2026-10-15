@@ -21,7 +21,7 @@ class InfraStack(Stack):
         bucket = s3.Bucket(
             self, "RawFeedBucket",
             lifecycle_rules=[
-                s3.LifecycleRule(expiration=Duration.days(90)),
+                s3.LifecycleRule(prefix="raw/", expiration=Duration.days(90)),   # only raw snapshots expire
             ],
         )
 
