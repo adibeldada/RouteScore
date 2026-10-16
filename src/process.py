@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone   # work out which hour to pr
 
 import boto3                                      # AWS SDK for Python (talk to S3)
 from google.transit import gtfs_realtime_pb2      # decode GTFS-Realtime (protobuf) data
+from stats import aggregate, save_totals
 
 # Created once when the file loads, then reused (faster on warm Lambda runs)
 s3 = boto3.client("s3")
@@ -123,6 +124,9 @@ def summarize(final):
 
 def save_arrivals(bucket_name, key, final):
     """Save final arrivals to S3 as gzipped JSON Lines (one arrival per line)."""
+    # bucket_name = which S3 bucket to save into (the RouteScore bucket, from the BUCKET_NAME env var)
+    # key = the file's full name/path inside the bucket, e.g. "arrivals/2026/10/15/18.jsonl.gz"
+    # final = the arrivals from find_final_arrivals: (trip_id, stop_sequence) -> arrival info
     lines = []
     for (trip_id, stop_sequence), value in final.items():   # unpack the tuple key right in the loop
         record = {
@@ -137,9 +141,13 @@ def save_arrivals(bucket_name, key, final):
         }
         lines.append(json.dumps(record))                    # dict -> one JSON string
 
-    body = "\n".join(lines).encode("utf-8")                 # one string -> bytes
-    compressed = gzip.compress(body)
+    # body = the whole file's contents: every JSON line joined with newlines, turned into bytes
+    # (S3 stores bytes, not Python strings)
+    body = "\n".join(lines).encode("utf-8")
+    compressed = gzip.compress(body)                        # shrink it before uploading
 
+    # ex: {"trip_id": "3324573", "stop_sequence": 14, "route_id": "5780", "stop_id": "2345", "time": 1760551920, "scheduled_time": 1760551680, "offset": 240, "status": "on time"}
+    # Upload: put these bytes (Body) into this bucket (Bucket) under this name (Key)
     s3.put_object(Bucket=bucket_name, Key=key, Body=compressed)
     print(f"Saved {len(lines)} arrivals to {key}")
 
@@ -181,6 +189,7 @@ def lambda_handler(event, context):
     final = find_final_arrivals(feeds)
 
     # Step 3: save those results to S3 as one file for this hour.
+    # ex: {"trip_id": "3324573", "stop_sequence": 14, "route_id": "5780", "stop_id": "2345", "time": 1760551920, "scheduled_time": 1760551680, "offset": 240, "status": "on time"}
     save_arrivals(bucket_name, key, final)
 
 # Only runs when executed directly, not when imported (e.g. by the Lambda later)
@@ -207,7 +216,7 @@ if __name__ == "__main__":
     summarize(s3_final)
 
     # --- Test 3: save the S3 results back to S3 as JSON Lines ---
-    save_arrivals(BUCKET, "arrivals/test.jsonl.gz", s3_final)
+    # save_arrivals(BUCKET, "arrivals/test.jsonl.gz", s3_final)
 
     # --- Test 4: the real Lambda entry point (processes the last full hour) ---
     lambda_handler(None, None)
