@@ -37,10 +37,9 @@ def save_totals(table_name, totals):
 
     for (pk, sk), counts in totals.items():          # unpack the tuple key, same trick as save_arrivals
         table.update_item(
-            Key={"pk": pk, "sk": sk},                 # which row (like WHERE pk = ... AND sk = ...)
-            # ADD = add to the existing numbers; creates the row (starting at 0) if it doesn't exist yet
-            UpdateExpression="ADD early :e, on_time :o, late :l, total :t",
-            # :e, :o, :l, :t are placeholders (like ? in SQL) filled in here
+            Key={"pk": pk, "sk": sk},
+            UpdateExpression="ADD early :e, on_time :o, late :l, #t :t",   # total -> #t
+            ExpressionAttributeNames={"#t": "total"},                       # new: #t means the "total" column
             ExpressionAttributeValues={
                 ":e": counts["early"],
                 ":o": counts["on_time"],
@@ -48,7 +47,7 @@ def save_totals(table_name, totals):
                 ":t": counts["total"],
             },
         )
-
+        
     print(f"Added {len(totals)} rows to {table_name}")
 
 if __name__ == "__main__":

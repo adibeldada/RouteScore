@@ -56,8 +56,8 @@ Not affiliated with the City of Hamilton or the HSR.
 - [ ] On-time % per route
 - [ ] On-time % per stop
 - [ ] On-time % by hour of day (e.g. rush hour vs. evening)
-- [ ] Daily summaries so stats build up over time
-- [ ] Store on-time % totals in DynamoDB
+- [x] Daily summaries so stats build up over time
+- [x] Store on-time % totals in DynamoDB
 
 ### v0.4: Public dashboard
 - [ ] Route leaderboard: most and least reliable routes
