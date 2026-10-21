@@ -171,6 +171,7 @@ def lambda_handler(event, context):
 
     # Which S3 bucket to use. CDK gives the Lambda this name as a setting (an environment variable).
     bucket_name = os.environ["BUCKET_NAME"]
+    table_name = os.environ["TABLE_NAME"]
 
     # Step 1: download every snapshot from that hour (~60 files, one per minute), oldest first,
     # and turn each one back into a feed we can read.
@@ -191,6 +192,11 @@ def lambda_handler(event, context):
     # Step 3: save those results to S3 as one file for this hour.
     # ex: {"trip_id": "3324573", "stop_sequence": 14, "route_id": "5780", "stop_id": "2345", "time": 1760551920, "scheduled_time": 1760551680, "offset": 240, "status": "on time"}
     save_arrivals(bucket_name, key, final)
+
+    # Step 4: count this hour's arrivals and add them to the running totals in DynamoDB.
+    totals = aggregate(final.values())
+    save_totals(table_name, totals)
+
 
 # Only runs when executed directly, not when imported (e.g. by the Lambda later)
 if __name__ == "__main__":
@@ -219,4 +225,4 @@ if __name__ == "__main__":
     # save_arrivals(BUCKET, "arrivals/test.jsonl.gz", s3_final)
 
     # --- Test 4: the real Lambda entry point (processes the last full hour) ---
-    lambda_handler(None, None)
+    # lambda_handler(None, None)

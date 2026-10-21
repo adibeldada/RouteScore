@@ -2,6 +2,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import boto3
+dynamodb = boto3.resource("dynamodb")
 
 def aggregate(final):
     """Count arrivals into scoreboard rows: (pk, sk) -> {early, on_time, late, total}."""
@@ -49,7 +50,6 @@ def save_totals(table_name, totals):
         )
 
     print(f"Added {len(totals)} rows to {table_name}")
-
 
 if __name__ == "__main__":
     records = [

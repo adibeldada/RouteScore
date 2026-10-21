@@ -6,6 +6,7 @@ from aws_cdk import (
     aws_events as events,
     aws_events_targets as targets,
     aws_s3 as s3,
+    aws_dynamodb as dynamodb,
 )
 from constructs import Construct
 
@@ -23,6 +24,14 @@ class InfraStack(Stack):
             lifecycle_rules=[
                 s3.LifecycleRule(prefix="raw/", expiration=Duration.days(90)),   # only raw snapshots expire
             ],
+        )
+
+        table = dynamodb.Table(
+            self, "StatsTable",
+            partition_key = dynamodb.Attribute(name="pk", type=dynamodb.AttributeType.STRING),
+            sort_key = dynamodb.Attribute(name="sk", type=dynamodb.AttributeType.STRING),
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST, 
+
         )
 
         # --- THE CODE (shared) ---
@@ -75,12 +84,14 @@ class InfraStack(Stack):
             memory_size=1024,                          # holds an hour of feeds in memory (more memory = faster too)
             environment={
                 "BUCKET_NAME": bucket.bucket_name,
+                "TABLE_NAME" : table.table_name
             },
         )
 
         # Process needs to read raw/ and write arrivals/.
         bucket.grant_read(process_fn)
         bucket.grant_put(process_fn)
+        table.grant_read_write_data(process_fn)
 
         # Timer: call the process Lambda at 5 minutes past every hour
         # (gives the last snapshot of the previous hour time to land first).
