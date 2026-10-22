@@ -23,17 +23,27 @@ RouteScore tracks how reliable Hamilton's HSR buses really are. Every minute, it
 - Comparison with the city's official on-time numbers
 
 ## Tech Stack
+
+### In use
 - Language: Python
-- Compute: AWS Lambda
+- Compute: AWS Lambda (fetch every minute, process every hour)
 - Scheduling: Amazon EventBridge
+- Storage: Amazon S3 (raw feed snapshots + hourly arrivals)
+- Database: Amazon DynamoDB (running reliability totals by route, stop, hour and day)
+- Infrastructure as Code: AWS CDK (Python)
+
+### Planned
 - Messaging: Amazon SQS
-- Database: Amazon DynamoDB (live data and stats), Amazon S3 (raw data archive)
 - Alerts: Amazon SNS
 - API: Amazon API Gateway
 - Frontend: HTML/JavaScript, hosted on S3 + CloudFront
-- Infrastructure as Code: AWS CDK (Python)
 - Testing: pytest, moto (mocked AWS services)
 - CI/CD: GitHub Actions
+
+## Data retention
+- Raw feed snapshots (`raw/`): deleted automatically after 90 days (S3 lifecycle rule)
+- Hourly arrivals (`arrivals/`): kept permanently (~1.5 GB/year)
+- Reliability totals (DynamoDB): kept permanently; they're running counts, so the table stays small
 
 ## Data Source
 Contains information licensed under the Open Government Licence – City of Hamilton. Uses the HSR GTFS schedule and GTFS-Realtime feeds.
@@ -52,12 +62,16 @@ Not affiliated with the City of Hamilton or the HSR.
 - [x] Classify arrivals as early, on time, or late (city definition: max 2 min early, 5 min late)
 - [x] Run hourly as a batch Lambda and save results to S3
 
-### v0.3: Reliability stats
-- [ ] On-time % per route
-- [ ] On-time % per stop
-- [ ] On-time % by hour of day (e.g. rush hour vs. evening)
+### ✅ v0.3: Reliability stats
+- [x] On-time % per route
+- [x] On-time % per stop
+- [x] On-time % by hour of day (e.g. rush hour vs. evening)
 - [x] Daily summaries so stats build up over time
 - [x] Store on-time % totals in DynamoDB
+
+Known issues (fixing next):
+- Arrivals with no scheduled time (`scheduled_time = 0`) are counted as on time, which inflates on-time %
+- Stats start from Oct 21; backfill of saved arrivals since Oct 15 still to do
 
 ### v0.4: Public dashboard
 - [ ] Route leaderboard: most and least reliable routes
@@ -84,6 +98,8 @@ Not affiliated with the City of Hamilton or the HSR.
 - [ ] Retry failed processing and capture bad data (dead-letter queue)
 - [ ] Detect feed outages and mark gaps clearly instead of skewing stats
 - [ ] Handle known feed quirks: duplicate trips, placeholder zero offsets
+- [ ] Skip arrivals with no scheduled time (placeholder zero times)
+- [ ] Catch arrivals that happen in the last minute of an hour (load the previous hour's last snapshot)
 
 ### v0.9: Rider experience
 - [ ] Mobile-friendly dashboard
