@@ -68,8 +68,9 @@ Not affiliated with the City of Hamilton or the HSR.
 - [x] On-time % by hour of day (e.g. rush hour vs. evening)
 - [x] Daily summaries so stats build up over time
 - [x] Store on-time % totals in DynamoDB
+- [x]  Skip arrivals with no scheduled time (placeholder zero times)
 
-Known issues (fixing next):
+Known issues, STATUS: ✅ **Fixed**
 - Arrivals with no scheduled time (`scheduled_time = 0`) are counted as on time, which inflates on-time %
 - Stats start from Oct 21; backfill of saved arrivals since Oct 15 still to do
 
@@ -98,7 +99,6 @@ Known issues (fixing next):
 - [ ] Retry failed processing and capture bad data (dead-letter queue)
 - [ ] Detect feed outages and mark gaps clearly instead of skewing stats
 - [ ] Handle known feed quirks: duplicate trips, placeholder zero offsets
-- [ ] Skip arrivals with no scheduled time (placeholder zero times)
 - [ ] Catch arrivals that happen in the last minute of an hour (load the previous hour's last snapshot)
 
 ### v0.9: Rider experience
