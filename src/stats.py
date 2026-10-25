@@ -9,6 +9,10 @@ def aggregate(final):
     totals = {}
 
     for arrival in final:
+
+        # skip placeholder arrivals with no scheduled time (feed sends 0 = Dec 31, 1969).
+        if (arrival["scheduled_time"] ==  0):
+            continue
         # Unix seconds -> Toronto time (used by the hour and day keys)
         when = datetime.fromtimestamp(arrival["scheduled_time"], ZoneInfo("America/Toronto"))
 
@@ -55,6 +59,7 @@ if __name__ == "__main__":
         {"trip_id": "3324573", "stop_sequence": 14, "route_id": "5780", "stop_id": "2345", "time": 1760551920, "scheduled_time": 1760551680, "offset": 240, "status": "on time"},
         {"trip_id": "3324573", "stop_sequence": 15, "route_id": "5780", "stop_id": "2346", "time": 1760552400, "scheduled_time": 1760551800, "offset": 600, "status": "late"},
         {"trip_id": "3324999", "stop_sequence": 3,  "route_id": "5828", "stop_id": "1100", "time": 1760551320, "scheduled_time": 1760551500, "offset": -180, "status": "early"},
+        {"trip_id": "999", "stop_sequence": 1, "route_id": "5780", "stop_id": "2345", "time": 0, "scheduled_time": 0, "offset": 0, "status": "on time"},
     ]
 
     totals = aggregate(records)

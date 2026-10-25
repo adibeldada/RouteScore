@@ -27,7 +27,7 @@ class InfraStack(Stack):
         )
 
         table = dynamodb.Table(
-            self, "StatsTable",
+            self, "StatsTableV2",
             partition_key = dynamodb.Attribute(name="pk", type=dynamodb.AttributeType.STRING),
             sort_key = dynamodb.Attribute(name="sk", type=dynamodb.AttributeType.STRING),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST, 
@@ -81,7 +81,7 @@ class InfraStack(Stack):
             handler="process.lambda_handler",
             code=code,
             timeout=Duration.minutes(5),               # ~60 files to download + process
-            memory_size=1024,                          # holds an hour of feeds in memory (more memory = faster too)
+            memory_size=2048,                          # holds an hour of feeds in memory (more memory = faster too)
             environment={
                 "BUCKET_NAME": bucket.bucket_name,
                 "TABLE_NAME" : table.table_name
