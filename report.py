@@ -9,7 +9,7 @@ routes = load_routes("data/routes.txt")   # "5780" -> "02 BARTON"
 stops = load_stops("data/stops.txt")      # "2345" -> "KING at JAMES"
 
 MIN_ROUTE_ARRIVALS = 10000                # leaderboard only counts main routes (skips tiny/special services)
-FOCUS_ROUTES = ["ROUTE#5828", "ROUTE#5783"]   # 01 KING, 05 DELAWARE: show these hour by hour
+FOCUS_ROUTES = ["ROUTE#5807", "ROUTE#5783"]   # 01 KING, 05 DELAWARE: show these hour by hour
 
 
 def label(pk, sk):
@@ -46,14 +46,20 @@ def pct(part, total):
 
 
 def calculate_pct(table):
-    """Print system-wide on-time %, the route leaderboard, and King/Delaware by hour."""
-    response = table.scan()
-    rows = response["Items"]
+    """Print system-wide on-time %, the route leaderboard, and King/Delaware by hour. 
+    takes in DynamoDB table that looks like: 
+    pk	        sk	early	on_time	late	total
+    ROUTE#5828	ALL	11,200	83,450	18,417	113,067"""
+
+    response = table.scan()          # SELECT * FROM stats -> {"Items": [row, row, ...], "Count": N, ...}
+    rows = response["Items"]         # just the rows: [{"pk": "ROUTE#5828", "sk": "ALL", "early": 11200, ...}, ...]
     print(f"{len(rows)} rows\n")
 
     system = {"early": 0, "on_time": 0, "late": 0, "total": 0}   # all of Hamilton combined
     results = []                                       # route leaderboard (one dict per route)
-    hourly = {pk: [] for pk in FOCUS_ROUTES}           # King/Delaware hour rows
+    hourly = {}
+    for pk in FOCUS_ROUTES:
+        hourly[pk]= []
 
     for row in rows:
         pk, sk = row["pk"], row["sk"]
