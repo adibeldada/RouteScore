@@ -27,7 +27,7 @@ class InfraStack(Stack):
         )
 
         table = dynamodb.Table(
-            self, "StatsTableV2",
+            self, "StatsTableV3",
             partition_key = dynamodb.Attribute(name="pk", type=dynamodb.AttributeType.STRING),
             sort_key = dynamodb.Attribute(name="sk", type=dynamodb.AttributeType.STRING),
             billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST, 

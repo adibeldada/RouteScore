@@ -2,7 +2,7 @@ import boto3
 from explore_static import load_routes, load_stops
 
 dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table("RouteScoreStack-StatsTableV2132B31BE-24JNAZIFB7U9")
+table = dynamodb.Table("RouteScoreStack-StatsTableV3CD71D0CC-FCBS2KYLLJX3")
 
 # Lookups from the static schedule: id -> name
 routes = load_routes("data/routes.txt")   # "5780" -> "02 BARTON"

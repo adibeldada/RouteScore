@@ -1,91 +1,108 @@
 import gzip                                    # unzip each arrivals file
 import json                                    # turn each line into a dict
+from concurrent.futures import ThreadPoolExecutor   # write many rows at once
+from datetime import datetime                  # safety check on the time
 
-import boto3                                   # talk to S3
-from src.stats import aggregate, save_totals   # count + save to DynamoDB
+import boto3                                   # talk to S3 + DynamoDB
+from src.stats import aggregate                # count arrivals into scoreboard rows
 
 BUCKET = "routescorestack-rawfeedbucket504cf208-nsj9oprvyysm"
-TABLE_NAME = "RouteScoreStack-StatsTableV2132B31BE-24JNAZIFB7U9"
-CUTOFF = "arrivals/2026/10/25/22"
+TABLE_NAME = "RouteScoreStack-StatsTableV3CD71D0CC-FCBS2KYLLJX3"
 
-s3 = boto3.client("s3")    # the connection
+s3 = boto3.client("s3")
+dynamodb = boto3.client("dynamodb")            # ONE client shared by all threads (clients are thread-safe)
+
 
 def list_arrival_files():
-    """Return the names of every arrivals file before CUTOFF, oldest first.
+    """Return the names of EVERY arrivals file, oldest first.
 
-    Returns a list of strings (S3 keys), e.g.:
-        ["arrivals/2026/10/15/18.jsonl.gz",
-         "arrivals/2026/10/15/19.jsonl.gz",
-         ...
-         "arrivals/2026/10/25/21.jsonl.gz"]     # ~198 names
+    Returns a list of strings, e.g. ["arrivals/2026/10/15/18.jsonl.gz", ..., "arrivals/2026/10/26/01.jsonl.gz"]
     """
     # List every file whose name starts with "arrivals/" (names + info only, no contents).
-    # Returns a dict, e.g.:
-    #   {"KeyCount": 199,
-    #    "Contents": [{"Key": "arrivals/2026/10/15/18.jsonl.gz", "Size": 157217, ...},
-    #                 {"Key": "arrivals/2026/10/15/19.jsonl.gz", "Size": 180630, ...}, ...]}
-    # Only "Key" is needed. Max 1,000 files per call (I have ~200).
+    # Returns a dict: {"KeyCount": 244, "Contents": [{"Key": "arrivals/...", "Size": ...}, ...]}
+    # Max 1,000 files per call (I have ~244).
     response = s3.list_objects_v2(Bucket=BUCKET, Prefix="arrivals/")
 
     keys = []
     for item in response["Contents"]:          # each item = one file's info
-        key = item["Key"]                      # just its name
-        if key < CUTOFF:                       # only hours the Lambda didn't already count
-            keys.append(key)
+        keys.append(item["Key"])               # just its name
 
     keys.sort()                                # oldest first (names are time-based)
-    return keys                                # list of file names (strings), not the files themselves
+    return keys
+
 
 def read_arrivals(key):
-    """Download one arrivals file and return its arrivals.
+    """Download one arrivals file and return its arrivals (list of dicts, one per arrival)."""
+    obj = s3.get_object(Bucket=BUCKET, Key=key)   # {"Body": <StreamingBody>, "ContentLength": ..., ...}
 
-    key = one file name, e.g. "arrivals/2026/10/15/18.jsonl.gz"
-
-    Returns a list of dicts (one per arrival), e.g.:
-        [{"trip_id": "3324573", "stop_sequence": 14, "route_id": "5780", "stop_id": "2345",
-          "time": 1760551920, "scheduled_time": 1760551680, "offset": 240, "status": "on time"},
-         ...]                                   # ~10,000 for a busy hour, 0 for 3-4am
-    """
-    # Download one file by its name (key).
-    # Returns a dict: {"Body": <StreamingBody>, "ContentLength": 157217, "LastModified": ..., ...}
-    obj = s3.get_object(Bucket=BUCKET, Key=key)
-
-    data = obj["Body"].read()            # the file's bytes, still gzipped: b'\x1f\x8b...'
-    unzipped = gzip.decompress(data)     # real bytes: b'{"trip_id": ...}\n{"trip_id": ...}'
-    text = unzipped.decode("utf-8")      # bytes -> string: '{"trip_id": ...}\n{"trip_id": ...}'
-    lines = text.split("\n")             # one string per arrival: ['{"trip_id": ...}', ...]
+    data = obj["Body"].read()            # the file's bytes, still gzipped
+    unzipped = gzip.decompress(data)     # real bytes
+    text = unzipped.decode("utf-8")      # bytes -> string
+    lines = text.split("\n")             # one string per arrival
 
     arrivals = []
     for line in lines:
-        if not line:                     # empty file (3-4am) or blank line -> nothing to read
+        if not line:                     # empty file (3-4am) or blank line
             continue
         arrivals.append(json.loads(line))   # one JSON line -> one dict
+    return arrivals
 
-    return arrivals                      # list of arrival dicts, ready for aggregate()
 
-def run_backfill(keys):
-    """Read each arrivals file, count it, and add it to the DynamoDB table.
+def merge(all_totals, totals):
+    """Add one hour's totals into the grand totals (both: (pk, sk) -> {early, on_time, late, total})."""
+    for key, counts in totals.items():
+        if key not in all_totals:                       # first time seeing this row
+            all_totals[key] = {"early": 0, "on_time": 0, "late": 0, "total": 0}
+        for field in ["early", "on_time", "late", "total"]:
+            all_totals[key][field] += counts[field]     # add this hour's numbers on top
 
-    keys = list of file names from list_arrival_files()
-    Prints progress per file and the total number of arrivals at the end.
-    """
-    total_arrivals = 0                              # running count across all files
 
+def set_row(item):
+    """Write ONE row's final totals. SET overwrites, so rerunning is safe (no double counting)."""
+    (pk, sk), counts = item
+    # The low-level client needs types: "S" = string, "N" = number (sent as text)
+    dynamodb.update_item(
+        TableName=TABLE_NAME,
+        Key={"pk": {"S": pk}, "sk": {"S": sk}},
+        UpdateExpression="SET early = :e, on_time = :o, late = :l, #t = :t",
+        ExpressionAttributeNames={"#t": "total"},       # "total" is a reserved word
+        ExpressionAttributeValues={
+            ":e": {"N": str(counts["early"])},
+            ":o": {"N": str(counts["on_time"])},
+            ":l": {"N": str(counts["late"])},
+            ":t": {"N": str(counts["total"])},
+        },
+    )
+
+
+def rebuild():
+    """Recount every arrivals file from scratch, then write the correct totals to the table."""
+    # Safety: the hourly Lambda writes around :05. Don't overlap with it.
+    minute = datetime.now().minute
+    if minute < 10 or minute > 55:
+        print(f"It's :{minute:02d} - run between :10 and :55 so the hourly Lambda doesn't overlap.")
+        return
+
+    keys = list_arrival_files()
+    print(f"{len(keys)} files: {keys[0]} -> {keys[-1]}\n")
+
+    # Step 1: count everything in memory (nothing written yet)
+    all_totals = {}
+    total_arrivals = 0
     for key in keys:
-        arrivals = read_arrivals(key)               # one hour's arrivals: list of dicts
-        totals = aggregate(arrivals)                # count them: (pk, sk) -> {early, on_time, late, total}
-        save_totals(TABLE_NAME, totals)             # ADD those counts into the table
+        arrivals = read_arrivals(key)
+        merge(all_totals, aggregate(arrivals))
+        total_arrivals += len(arrivals)
+        print(f"{key}: {len(arrivals)} arrivals")
 
-        total_arrivals += len(arrivals)             # keep the overall count
-        print(f"{key}: {len(arrivals)} arrivals")   # progress, one line per file
+    print(f"\nCounted {total_arrivals} arrivals into {len(all_totals)} rows. Writing...")
 
-    print(f"\nDone: {len(keys)} files, {total_arrivals} arrivals")
+    # Step 2: write each row once, 16 at a time
+    with ThreadPoolExecutor(max_workers=16) as pool:
+        list(pool.map(set_row, all_totals.items()))     # list() waits for all, and re-raises any error
+
+    print(f"Done: {len(keys)} files, {total_arrivals} arrivals, {len(all_totals)} rows written")
 
 
 if __name__ == "__main__":
-    keys = list_arrival_files()
-    print(f"{len(keys)} files to backfill: {keys[0]} -> {keys[-1]}\n")
-
-    # The first 2 files were already added in the test run, so skip them (no double counting).
-    # Run this ONCE.
-    run_backfill(keys[2:])
+    rebuild()
