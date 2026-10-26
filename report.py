@@ -8,6 +8,9 @@ table = dynamodb.Table("RouteScoreStack-StatsTableV3CD71D0CC-FCBS2KYLLJX3")
 routes = load_routes("data/routes.txt")   # "5780" -> "02 BARTON"
 stops = load_stops("data/stops.txt")      # "2345" -> "KING at JAMES"
 
+MIN_ROUTE_ARRIVALS = 10000                # leaderboard only counts main routes (skips tiny/special services)
+FOCUS_ROUTES = ["ROUTE#5828", "ROUTE#5783"]   # 01 KING, 05 DELAWARE: show these hour by hour
+
 
 def label(pk, sk):
     """Turn a row's keys into something readable."""
@@ -30,47 +33,87 @@ def label(pk, sk):
     return f"{pk} / {sk}"                              # anything else: show as is
 
 
+def hour_label(sk):
+    """'HOUR#17' -> '5pm', 'HOUR#00' -> '12am'."""
+    hour = int(sk.replace("HOUR#", ""))
+    suffix = "am" if hour < 12 else "pm"
+    return f"{hour % 12 or 12}{suffix}"
+
+
+def pct(part, total):
+    """Percent, safe if total is 0."""
+    return part / total * 100 if total else 0
+
+
 def calculate_pct(table):
-    """Read every row, then print the 5 worst and 5 best routes by on-time %."""
+    """Print system-wide on-time %, the route leaderboard, and King/Delaware by hour."""
     response = table.scan()
     rows = response["Items"]
     print(f"{len(rows)} rows\n")
 
-    results = []                                       # one dict per route (overall)
+    system = {"early": 0, "on_time": 0, "late": 0, "total": 0}   # all of Hamilton combined
+    results = []                                       # route leaderboard (one dict per route)
+    hourly = {pk: [] for pk in FOCUS_ROUTES}           # King/Delaware hour rows
 
     for row in rows:
-        total = int(row["total"])                      # DynamoDB gives Decimal -> int
-        if total < 500:                                # too few arrivals to trust the %
-            continue
-
-        early = int(row["early"])
+        pk, sk = row["pk"], row["sk"]
+        early = int(row["early"])                      # DynamoDB gives Decimal -> int
         on_time = int(row["on_time"])
         late = int(row["late"])
+        total = int(row["total"])
 
-        pct_early = early / total * 100
-        pct_on_time = on_time / total * 100
-        pct_late = late / total * 100
+        # 1) System-wide: add up every route's overall row (all routes, no size filter)
+        if pk.startswith("ROUTE#") and sk == "ALL":
+            system["early"] += early
+            system["on_time"] += on_time
+            system["late"] += late
+            system["total"] += total
 
-        # Only routes overall (ROUTE#... / ALL) go on the leaderboard
-        if row["pk"].startswith("ROUTE#") and row["sk"] == "ALL":
-            results.append({
-                "name": label(row["pk"], row["sk"]),   # "02 BARTON / ALL" instead of "ROUTE#5780"
-                "early": pct_early,
-                "on_time": pct_on_time,
-                "late": pct_late,
+            # 2) Leaderboard: only main routes
+            if total >= MIN_ROUTE_ARRIVALS:
+                results.append({
+                    "name": label(pk, sk),
+                    "early": pct(early, total),
+                    "on_time": pct(on_time, total),
+                    "late": pct(late, total),
+                    "total": total,
+                })
+
+        # 3) Hour-by-hour rows for the focus routes
+        if pk in FOCUS_ROUTES and sk.startswith("HOUR#"):
+            hourly[pk].append({
+                "sk": sk,
+                "on_time": pct(on_time, total),
+                "late": pct(late, total),
+                "early": pct(early, total),
                 "total": total,
             })
 
-    # Sort worst -> best by on-time % (like ORDER BY on_time)
-    results.sort(key=lambda r: r["on_time"])
+    # --- System-wide ---
+    t = system["total"]
+    print("All of Hamilton:")
+    print(f"  on time {pct(system['on_time'], t):.1f}% | late {pct(system['late'], t):.1f}% | early {pct(system['early'], t):.1f}% ({t} arrivals)\n")
 
-    print("Worst 5 routes (least on time):")
-    for r in results[:5]:                              # first 5 = lowest on-time %
+    # --- Leaderboard ---
+    results.sort(key=lambda r: r["on_time"])           # worst -> best
+
+    print(f"Worst 5 routes (least on time, {MIN_ROUTE_ARRIVALS}+ arrivals):")
+    for r in results[:5]:
         print(f"  {r['name']}: on time {r['on_time']:.1f}% | late {r['late']:.1f}% | early {r['early']:.1f}% ({r['total']} arrivals)")
 
-    print("\nBest 5 routes (most on time):")
-    for r in reversed(results[-5:]):                   # last 5 = highest; reversed so #1 prints first
+    print(f"\nBest 5 routes (most on time, {MIN_ROUTE_ARRIVALS}+ arrivals):")
+    for r in reversed(results[-5:]):
         print(f"  {r['name']}: on time {r['on_time']:.1f}% | late {r['late']:.1f}% | early {r['early']:.1f}% ({r['total']} arrivals)")
+
+    # --- Focus routes by hour of day ---
+    for pk in FOCUS_ROUTES:
+        name = routes.get(pk.replace("ROUTE#", ""), pk)
+        print(f"\n{name} by hour (Toronto time):")
+        for h in sorted(hourly[pk], key=lambda r: r["sk"]):     # HOUR#05, HOUR#06, ... in order
+            if h["total"] < 200:                               # skip near-empty overnight hours
+                continue
+            print(f"  {hour_label(h['sk']):>4}: on time {h['on_time']:.1f}% | late {h['late']:.1f}% | early {h['early']:.1f}% ({h['total']} arrivals)")
+
 
 if __name__ == "__main__":
     calculate_pct(table)
