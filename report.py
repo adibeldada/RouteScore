@@ -1,3 +1,14 @@
+"""
+report.py
+
+Reads the stats table and prints the findings. Read-only, never writes.
+
+Prints: all of Hamilton on-time %, the worst and best 5 main routes
+(10,000+ arrivals), and King / Delaware hour by hour.
+
+Run from my laptop: python report.py
+"""
+
 import boto3
 from explore_static import load_routes, load_stops
 

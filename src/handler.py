@@ -1,7 +1,13 @@
 """
 handler.py
-AWS Lambda entry point for RouteScore.
-Fetches Hamilton's live HSR trip updates feed.
+
+Fetch Lambda: runs every minute (EventBridge "EveryMinute").
+
+Downloads the HSR live feed (GTFS-Realtime) and saves it to S3 as
+raw/YYYY/MM/DD/HHMMSS.pb.gz. This is how RouteScore builds its own history,
+since the city only shows upcoming stops and keeps no public history.
+
+Flow: lambda_handler -> fetch_feed -> save_snapshot
 """
 
 import gzip                                       # compress the feed before saving

@@ -1,5 +1,6 @@
 """
 explore_feed.py
+
 Playground script for exploring Hamilton's live HSR GTFS-Realtime feed.
 Downloads the trip updates feed, decodes it, and prints:
   - per-stop arrival offsets (early / on time / late) for the first 3 trips,
@@ -7,6 +8,8 @@ Downloads the trip updates feed, decodes it, and prints:
   - the planned time from stop_times.txt next to the feed's scheduled time
   - a summary of the first 5 trips
   - basic info about the feed itself
+
+Not used by any Lambda. Run from my laptop: python explore_feed.py
 """
 
 from datetime import datetime                     # turn Unix seconds into a readable time

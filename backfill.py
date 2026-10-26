@@ -1,3 +1,16 @@
+"""
+backfill.py
+
+Rebuilds the DynamoDB stats table from every saved arrivals/ file in S3.
+
+Counts everything in memory first, then SETs each row to its exact total,
+so it's safe to rerun (no double counting). Uses aggregate from src/stats.py.
+Only runs between :10 and :55 so it never overlaps the hourly Lambda.
+
+Run from my laptop: python backfill.py
+"""
+
+
 import gzip                                    # unzip each arrivals file
 import json                                    # turn each line into a dict
 from concurrent.futures import ThreadPoolExecutor   # write many rows at once

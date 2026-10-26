@@ -1,3 +1,16 @@
+"""
+stats.py
+
+Turns arrivals into reliability counts and saves them to DynamoDB.
+
+aggregate:   counts each arrival into 4 rows (route all-time, route by hour,
+             stop all-time, route by day). Skips arrivals with no scheduled time.
+save_totals: ADDs those counts to the running totals in the table.
+
+Only counts are stored. Percentages are worked out when reading (report.py / api.py).
+Used by process.py (every hour) and backfill.py (rebuild).
+"""
+
 from datetime import datetime
 from zoneinfo import ZoneInfo
 

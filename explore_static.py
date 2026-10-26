@@ -1,6 +1,12 @@
 """
 explore_static.py
-Loads lookups from Hamilton's static GTFS schedule (the files in data/).
+
+Loads the HSR static schedule (GTFS files in data/).
+
+load_routes: routes.txt -> {"5828": "01 KING", ...}
+load_stops:  stops.txt  -> {"2345": "KING at JAMES", ...}
+
+Used by report.py to turn IDs into readable names.
 """
 
 import csv

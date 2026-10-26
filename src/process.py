@@ -1,6 +1,17 @@
 """
 process.py
-Turns saved feed snapshots into final arrival records (one per bus per stop).
+
+Process Lambda: runs every hour at :05 (EventBridge "EveryHour").
+
+Takes the last hour's ~60 snapshots from raw/, works out when each bus
+actually reached each stop (the last prediction before the stop disappeared),
+and classifies each arrival as early / on time / late (max 2 min early, 5 min late).
+
+Saves the arrivals to S3 (arrivals/YYYY/MM/DD/HH.jsonl.gz), then adds the
+counts to DynamoDB through stats.py.
+
+Flow: lambda_handler -> load_feeds_from_s3 -> find_final_arrivals
+      -> save_arrivals -> aggregate -> save_totals
 """
 
 import gzip                                       # decompress the saved snapshots
