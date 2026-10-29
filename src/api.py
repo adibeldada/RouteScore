@@ -85,7 +85,9 @@ def get_route_day(route_id, day):
 
     return result
 
-
+def get_home()
+    response = table.query(KeyConditionExpression=Key("pk").eq("DAY#"+day) & Key("sk").eq("ROUTE#"+route_id))
+    rows = response["Items"]
 
 if __name__ == "__main__":
     print(get_route("5807"))

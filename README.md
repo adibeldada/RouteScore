@@ -75,6 +75,7 @@ Known issues, STATUS: ✅ **Fixed**
 - Stats start from Oct 21; backfill of saved arrivals since Oct 15 still to do
 
 ### v0.4: Public dashboard
+- [ ] Api.py backend setup
 - [ ] Route leaderboard: most and least reliable routes
 - [ ] Route page with hour-by-hour reliability chart
 - [ ] Stop lookup: how reliable is my stop?
