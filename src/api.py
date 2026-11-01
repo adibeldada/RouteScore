@@ -85,14 +85,42 @@ def get_route_day(route_id, day):
 
     return result
 
-def get_home()
-    response = table.query(KeyConditionExpression=Key("pk").eq("DAY#"+day) & Key("sk").eq("ROUTE#"+route_id))
+def get_home():
+    response = table.scan( FilterExpression=Key("pk").begins_with("ROUTE#") & Key("sk").eq("ALL") ) 
     rows = response["Items"]
+
+
+    system = {"early": 0, "on_time": 0, "late": 0, "total": 0}   # all of Hamilton combined
+    for row in rows:
+        early = int(row["early"])                      # DynamoDB gives Decimal -> int
+        on_time = int(row["on_time"])
+        late = int(row["late"])
+        total = int(row["total"])
+
+        
+        system["early"] += early
+        system["on_time"] += on_time
+        system["late"] += late
+        system["total"] += total
+
+    system_result = {
+        "on_time": pct(system["on_time"], system["total"]),
+        "late": pct(system["late"], system["total"]),
+        "early": pct(system["early"], system["total"]),
+        "total": system["total"],
+    }
+
+    return system_result
+
+    def get_leaderboard():
+        
+
 
 if __name__ == "__main__":
     print(get_route("5807"))
     print(get_route_day("5807", "2026-10-21"))
     print(get_route_day("5807", "2020-01-01"))
+    print(get_home())
 
         
  

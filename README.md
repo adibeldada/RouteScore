@@ -79,6 +79,7 @@ Known issues, STATUS: ✅ **Fixed**
 - [ ] Route leaderboard: most and least reliable routes
 - [ ] Route page with hour-by-hour reliability chart
 - [ ] Stop lookup: how reliable is my stop?
+- [ ] Deploy 
 
 ### v0.5: Quality
 - [ ] Unit tests (pytest) for delay and stats logic
