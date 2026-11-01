@@ -75,11 +75,12 @@ Known issues, STATUS: ✅ **Fixed**
 - Stats start from Oct 21; backfill of saved arrivals since Oct 15 still to do
 
 ### v0.4: Public dashboard
-- [ ] Api.py backend setup
+- [x] API backend (api.py): route, day, home, leaderboard, stop lookups + request routing
+- [ ] Deploy API (Lambda + API Gateway, CDK)
 - [ ] Route leaderboard: most and least reliable routes
 - [ ] Route page with hour-by-hour reliability chart
 - [ ] Stop lookup: how reliable is my stop?
-- [ ] Deploy 
+- [ ] Deploy frontend (S3)
 
 ### v0.5: Quality
 - [ ] Unit tests (pytest) for delay and stats logic

@@ -14,8 +14,18 @@ get_stop(stop_id):            one stop, all routes combined (stop lookup)
 Coming: lambda_handler
 """
 
+# Paths the website can call (I designed these; frontend must use the same ones):
+#   /home                          -> get_home()                    all of Hamilton
+#   /leaderboard                   -> get_leaderboard()             main routes, best -> worst
+#   /routes/<route_id>             -> get_route(route_id)           e.g. /routes/5828
+#   /routes/<route_id>/days/<day>  -> get_route_day(route_id, day)  e.g. /routes/5828/days/2026-10-21
+#   /stops/<stop_id>               -> get_stop(stop_id)             e.g. /stops/2345
+#   anything else                  -> 404 {"error": "not found"}
+
 import boto3                                        # talk to DynamoDB
 from boto3.dynamodb.conditions import Key, Attr     # Key = query conditions, Attr = scan filters
+import json 
+
 
 dynamodb = boto3.resource("dynamodb")                                         # connect to DynamoDB
 table = dynamodb.Table("RouteScoreStack-StatsTableV3CD71D0CC-FCBS2KYLLJX3")   # handle to the V3 table
@@ -181,11 +191,84 @@ def get_stop(stop_id):
     return result
 
 
+def respond(status, body):
+    """Wrap data in the format API Gateway expects. its a helper funciton"""
+    return {
+        "statusCode": status,                              # 200 = OK, 404 = not found
+        "headers": {"Access-Control-Allow-Origin": "*"},   # CORS: let the website read it
+        "body": json.dumps(body),                          # body must be text, not a dict
+    }
+
+
+# event = the request, built by API Gateway, e.g. for https://.../routes/5828:
+# {
+#     "resource": "/{proxy+}",
+#     "path": "/routes/5828",                   ← the only part I use
+#     "httpMethod": "GET",                      ← GET = just reading
+#     "headers": {"Host": "abc123.execute-api.ca-central-1.amazonaws.com", ...},
+#     "queryStringParameters": None,            ← anything after ? in the URL (none here)
+#     "pathParameters": {"proxy": "routes/5828"},
+#     "requestContext": {"stage": "prod", ...}, ← info about the request
+#     "body": None,                             ← GET requests have no body
+# }
+#
+# context = info about this Lambda run (request id, time left). Not used.
+#
+# To test on my laptop, a fake event with just the path is enough:
+#     lambda_handler({"path": "/routes/5807"}, None)
+def lambda_handler(event, context):
+    parts = event["path"].strip("/").split("/")    # "/routes/5828" -> ["routes", "5828"]
+
+    # /home -> get_home()
+    if len(parts) == 1 and parts[0] == "home":
+        result = get_home()
+        return respond(200, result)
+
+    # /leaderboard -> get_leaderboard()
+    elif len(parts) == 1 and parts[0] == "leaderboard":
+        result = get_leaderboard()
+        return respond(200, result)
+
+    # /routes/<route_id> -> get_route(route_id)
+    elif len(parts) == 2 and parts[0] == "routes":
+        route_id = parts[1]
+        result = get_route(route_id)
+        if result["overall"] is None:                       # no such route
+            return respond(404, {"error": "not found"})
+        return respond(200, result)
+
+    # /routes/<route_id>/days/<day> -> get_route_day(route_id, day)
+    elif len(parts) == 4 and parts[0] == "routes" and parts[2] == "days":
+        route_id = parts[1]
+        day = parts[3]
+        result = get_route_day(route_id, day)
+        if result is None:                                  # no data that day
+            return respond(404, {"error": "not found"})
+        return respond(200, result)
+
+    # /stops/<stop_id> -> get_stop(stop_id)
+    elif len(parts) == 2 and parts[0] == "stops":
+        stop_id = parts[1]
+        result = get_stop(stop_id)
+        if result is None:                                  # no such stop
+            return respond(404, {"error": "not found"})
+        return respond(200, result)
+
+    return respond(404, {"error": "not found"})             # path didn't match anything
+    
+
 if __name__ == "__main__":
     print(get_route("5807"))
     print(get_route_day("5807", "2026-10-21"))
     print(get_route_day("5807", "2020-01-01"))   # no data -> None
     print(get_home())
     print(get_leaderboard())
-    print(get_stop("2345"))                      # swap in a real stop id from stops.txt
+    print(get_stop("1001"))                     
     print(get_stop("0"))                         # not a stop -> None
+    print(lambda_handler({"path": "/home"}, None))
+    print(lambda_handler({"path": "/leaderboard"}, None))
+    print(lambda_handler({"path": "/routes/5807"}, None))
+    print(lambda_handler({"path": "/routes/5807/days/2026-10-21"}, None))
+    print(lambda_handler({"path": "/stops/1001"}, None))       # real stop id
+    print(lambda_handler({"path": "/stops/0"}, None))          # → 404
+    print(lambda_handler({"path": "/banana"}, None))           # → 404
