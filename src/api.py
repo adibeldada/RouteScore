@@ -24,11 +24,12 @@ Coming: lambda_handler
 
 import boto3                                        # talk to DynamoDB
 from boto3.dynamodb.conditions import Key, Attr     # Key = query conditions, Attr = scan filters
-import json 
 
+import json 
+import os
 
 dynamodb = boto3.resource("dynamodb")                                         # connect to DynamoDB
-table = dynamodb.Table("RouteScoreStack-StatsTableV3CD71D0CC-FCBS2KYLLJX3")   # handle to the V3 table
+table = dynamodb.Table(os.environ.get("TABLE_NAME", "RouteScoreStack-StatsTableV3CD71D0CC-FCBS2KYLLJX3"))
 
 MIN_ROUTE_ARRIVALS = 10000      # leaderboard only counts main routes (skips tiny/special services)
 

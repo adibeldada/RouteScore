@@ -1,14 +1,16 @@
 from aws_cdk import (
-    BundlingOptions,
-    Duration,
-    Stack,
-    aws_lambda as _lambda,
-    aws_events as events,
-    aws_events_targets as targets,
-    aws_s3 as s3,
-    aws_dynamodb as dynamodb,
+    BundlingOptions,                 # how to package src/ (pip install inside a Lambda-like Docker container)
+    CfnOutput,                       # print a value (the API URL) after cdk deploy
+    Duration,                        # time values: Duration.seconds(10), Duration.minutes(5), Duration.days(90)
+    Stack,                           # the base class InfraStack builds on (one deployable group of AWS resources)
+    aws_lambda as _lambda,           # Lambda functions (fetch, process, api) + their code and runtime
+    aws_events as events,            # EventBridge rules: the timers (every minute, every hour)
+    aws_events_targets as targets,   # what a rule runs: targets.LambdaFunction(fetch_fn)
+    aws_s3 as s3,                    # S3 bucket for raw/ and arrivals/
+    aws_dynamodb as dynamodb,        # DynamoDB stats table
+    aws_apigateway as apigateway,    # API Gateway: gives api_fn a URL
 )
-from constructs import Construct
+from constructs import Construct     # the type for "scope": every CDK piece is a Construct
 
 
 class InfraStack(Stack):
@@ -66,6 +68,7 @@ class InfraStack(Stack):
         bucket.grant_put(fetch_fn)
 
         # Timer: call the fetch Lambda every 1 minute.
+        # This is EventBridge 1 (targets.lambdaFunciton(fetch_fn)) is what runs it every minute
         rule = events.Rule(
             self, "EveryMinute",
             schedule=events.Schedule.rate(Duration.minutes(1)),
@@ -95,8 +98,35 @@ class InfraStack(Stack):
 
         # Timer: call the process Lambda at 5 minutes past every hour
         # (gives the last snapshot of the previous hour time to land first).
+        # This is EventBridge 2 (targets.lambdaFunciton(process_fn)) is what runs it every hour
         hourly_rule = events.Rule(
             self, "EveryHour",
             schedule=events.Schedule.cron(minute="5"),
             targets=[targets.LambdaFunction(process_fn)],
         )
+
+        # --- LAMBDA 3 ---
+        api_fn = _lambda.Function(
+            self, "ApiFunction",
+            runtime=_lambda.Runtime.PYTHON_3_13,
+            handler="api.lambda_handler",
+            code=code,
+            timeout=Duration.seconds(10),
+            memory_size=256,
+            environment={
+                "TABLE_NAME" : table.table_name
+            },
+        )
+
+        # api_fn needs to be able to read the table
+        table.grant_read_data(api_fn)       # API only reads the stats table
+
+        # API Gateway: gives api_fn a URL. Every path (/home, /routes/5828, ...)
+        # is sent to api_fn's lambda_handler, which decides what to do.
+        api = apigateway.LambdaRestApi(
+            self, "RouteScoreApi",
+            handler=api_fn,
+        )
+
+        # Print the API's URL after cdk deploy
+        CfnOutput(self, "ApiUrl", value=api.url)
