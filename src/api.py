@@ -117,6 +117,7 @@ def get_route(route_id):
 
     result = {
         "route_id": route_id,
+        "name": routes.get(route_id, "Unknown"),
         "overall": overall,
         "hours": hours,
     }
@@ -140,6 +141,7 @@ def get_route_day(route_id, day):
 
     result = {
         "route_id": route_id,
+        "name": routes.get(route_id, "Unknown"),
         "day": day,
         "on_time": pct(on_time, total),
         "late": pct(late, total),
@@ -183,9 +185,11 @@ def get_leaderboard():
         early = int(row["early"])                  # DynamoDB gives Decimal -> int
         on_time = int(row["on_time"])
         late = int(row["late"])
+        route_id = row["pk"].replace("ROUTE#", "") # "ROUTE#5828" -> "5828"
 
         leaderboard.append({
-            "route_id": row["pk"].replace("ROUTE#", ""),   # "ROUTE#5828" -> "5828"
+            "route_id": route_id,   
+            "name": routes.get(route_id, "Unknown"),
             "on_time": pct(on_time, total),
             "late": pct(late, total),
             "early": pct(early, total),
@@ -213,6 +217,7 @@ def get_stop(stop_id):
 
     result = {
         "stop_id": stop_id,
+        "name": stops.get(stop_id, "Unknown"),
         "on_time": pct(on_time, total),
         "late": pct(late, total),
         "early": pct(early, total),

@@ -19,7 +19,7 @@ fetch(API + "/leaderboard")                             // ask the API for /home
     for (const route of data) {
       list.innerHTML += `<tr>
         <td>${rank}</td>
-        <td>Route ${route.route_id}</td>
+        <td>${route.name}</td>
         <td>${route.on_time}%</td>
         <td>${route.late}%</td>
         <td>${route.early}%</td>
