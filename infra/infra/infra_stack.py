@@ -126,6 +126,10 @@ class InfraStack(Stack):
         api = apigateway.LambdaRestApi(
             self, "RouteScoreApi",
             handler=api_fn,
+            deploy_options=apigateway.StageOptions(
+                throttling_rate_limit=10,     # max 10 requests/second on average
+                throttling_burst_limit=20,    # allow short bursts up to 20 at once
+            ),
         )
 
         # Print the API's URL after cdk deploy

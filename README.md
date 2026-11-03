@@ -76,7 +76,7 @@ Known issues, STATUS: ✅ **Fixed**
 
 ### v0.4: Public dashboard
 - [x] API backend (api.py): route, day, home, leaderboard, stop lookups + request routing
-- [ ] Deploy API (Lambda + API Gateway, CDK)
+- [x] Deploy API (Lambda + API Gateway, CDK)
 - [ ] Route leaderboard: most and least reliable routes
 - [ ] Route page with hour-by-hour reliability chart
 - [ ] Stop lookup: how reliable is my stop?
