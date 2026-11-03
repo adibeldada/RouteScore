@@ -1,0 +1,14 @@
+th, td {
+  padding: 10px 24px;        /* was 6px 12px → more space above/below and between columns */
+  text-align: right;
+}
+
+body {
+  margin: 40px;              /* space around the whole page */
+  font-family: sans-serif;   /* cleaner font than the default */
+}
+
+table {
+  border-collapse: collapse;
+  margin-top: 16px;          /* space between the heading and the table */
+}

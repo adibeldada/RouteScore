@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RouteScore</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <h1>RouteScore</h1>
+  <p>How reliable are Hamilton's buses?</p>
+
+  <!-- All of Hamilton: filled by app.js from /home -->
+  <section id="system">Loading...</section>
+
+  <!-- Leaderboard: filled by app.js from /leaderboard -->
+  <h2>Routes, most to least reliable</h2>
+  <table>
+    <thead>                                  <!-- header row -->
+      <tr>
+        <th>#</th>
+        <th>Route</th>
+        <th>On time</th>
+        <th>Late</th>
+        <th>Early</th>
+        <th>Arrivals</th>
+      </tr>
+    </thead>
+    <tbody id="leaderboard">                 <!-- app.js puts one <tr> per route here -->
+      <tr><td colspan="6">Loading...</td></tr>
+    </tbody>
+  </table>
+
+  <script src="app.js"></script>             <!-- last, so the elements above exist first -->
+</body>
+</html>

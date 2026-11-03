@@ -27,11 +27,41 @@ from boto3.dynamodb.conditions import Key, Attr     # Key = query conditions, At
 
 import json 
 import os
+import csv
 
 dynamodb = boto3.resource("dynamodb")                                         # connect to DynamoDB
 table = dynamodb.Table(os.environ.get("TABLE_NAME", "RouteScoreStack-StatsTableV3CD71D0CC-FCBS2KYLLJX3"))
 
 MIN_ROUTE_ARRIVALS = 10000      # leaderboard only counts main routes (skips tiny/special services)
+
+def load_routes(path):
+    """Read routes.txt into a dict of route_id -> 'short long' name."""
+    routes = {}
+
+    with open(path, newline="", encoding="utf-8") as f:   # newline="" = let csv handle line endings
+        reader = csv.DictReader(f)                          # first line = column names
+        for row in reader:
+            route_id = row["route_id"]
+            route_name = f"{row['route_short_name']} {row['route_long_name']}"   # e.g. "02 BARTON"
+            routes[route_id] = route_name
+
+    return routes
+
+def load_stops(path):
+    """Read stops.txt into a dict of stop_id -> stop name."""
+    stops = {}
+
+    with open(path, newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            stop_id = row["stop_id"]
+            stop_name = row["stop_name"]                    # e.g. "MELVIN at ADAIR"
+            stops[stop_id] = stop_name
+
+    return stops
+
+routes = load_routes(os.path.join(os.path.dirname(__file__), "routes.txt"))   # "5828" -> "01 KING"
+stops = load_stops(os.path.join(os.path.dirname(__file__), "stops.txt"))      # "1001" -> "KING at JAMES"
 
 
 def pct(part, total):
