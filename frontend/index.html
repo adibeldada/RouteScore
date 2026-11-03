@@ -31,6 +31,20 @@
     </tbody>
   </table>
 
+  <h2>Route by hour</h2>
+<select id="route-picker">
+  <option value="">Pick a route</option>     <!-- placeholder option -->
+</select>
+
+<section id="route-overall"></section>        <!-- overall numbers for the picked route -->
+
+<table>
+  <thead>
+    <tr><th>Hour</th><th>On time</th><th>Late</th><th>Early</th><th>Arrivals</th></tr>
+  </thead>
+  <tbody id="route-hours"></tbody>            <!-- JS fills the hour rows here -->
+</table>
+
   <script src="app.js"></script>             <!-- last, so the elements above exist first -->
 </body>
 </html>

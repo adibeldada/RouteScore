@@ -77,10 +77,13 @@ Known issues, STATUS: ✅ **Fixed**
 ### v0.4: Public dashboard
 - [x] API backend (api.py): route, day, home, leaderboard, stop lookups + request routing
 - [x] Deploy API (Lambda + API Gateway, CDK)
-- [ ] Route leaderboard: most and least reliable routes
-- [ ] Route page with hour-by-hour reliability chart
+- [x] Route and stop names in the API (from routes.txt / stops.txt)
+- [x] Route leaderboard: most and least reliable routes
+- [x] Route picker with hour-by-hour reliability table
+- [ ] Hour-by-hour chart (Chart.js)
+- [ ] Day picker: how a route did on a specific day
 - [ ] Stop lookup: how reliable is my stop?
-- [ ] Deploy frontend (S3)
+- [ ] Deploy frontend (S3 + CloudFront)
 
 ### v0.5: Quality
 - [ ] Unit tests (pytest) for delay and stats logic
