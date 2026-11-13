@@ -31,20 +31,29 @@
     </tbody>
   </table>
 
+  <!-- Route by hour: dropdown filled from /leaderboard, hours filled from /routes/<id> -->
   <h2>Route by hour</h2>
-<select id="route-picker">
-  <option value="">Pick a route</option>     <!-- placeholder option -->
-</select>
+  <select id="route-picker">
+    <option value="">Pick a route</option>   <!-- placeholder option -->
+  </select>
 
-<section id="route-overall"></section>        <!-- overall numbers for the picked route -->
+  <section id="route-overall"></section>      <!-- overall numbers for the picked route -->
 
-<table>
-  <thead>
-    <tr><th>Hour</th><th>On time</th><th>Late</th><th>Early</th><th>Arrivals</th></tr>
-  </thead>
-  <tbody id="route-hours"></tbody>            <!-- JS fills the hour rows here -->
-</table>
+  <table>
+    <thead>
+      <tr><th>Hour</th><th>On time</th><th>Late</th><th>Early</th><th>Arrivals</th></tr>
+    </thead>
+    <tbody id="route-hours"></tbody>          <!-- JS fills the hour rows here -->
+  </table>
 
   <script src="app.js"></script>             <!-- last, so the elements above exist first -->
+
+  <!-- Stop lookup: filled by app.js -->
+  <h2>How reliable is my stop?</h2>
+  <input id="stop-input" list="stop-list" placeholder="Type a stop name...">
+    <option value=""></option>    <!-- placeholder option -->
+  </select>
+
+
 </body>
 </html>
