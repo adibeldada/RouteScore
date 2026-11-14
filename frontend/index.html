@@ -46,14 +46,12 @@
     <tbody id="route-hours"></tbody>          <!-- JS fills the hour rows here -->
   </table>
 
-  <script src="app.js"></script>             <!-- last, so the elements above exist first -->
-
   <!-- Stop lookup: filled by app.js -->
   <h2>How reliable is my stop?</h2>
   <input id="stop-input" list="stop-list" placeholder="Type a stop name...">
-    <option value=""></option>    <!-- placeholder option -->
-  </select>
-
+    <datalist id="stop-list"></datalist>  <!-- JS fills this with every stop -->
+  
+  <script src="app.js"></script>             <!-- last, so the elements above exist first -->
 
 </body>
 </html>

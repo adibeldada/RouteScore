@@ -199,6 +199,21 @@ def get_leaderboard():
     leaderboard.sort(key=lambda r: r["on_time"], reverse=True)   # best -> worst
     return leaderboard
 
+def get_stops():
+    all_stops = []
+
+    for pair in stops.items():
+        stop_id = pair[0]
+        stop_name = pair[1]
+        id_name = {
+            "stop_id": stop_id,
+            "name": stop_name,
+        }
+        all_stops.append(id_name)
+
+    return all_stops
+
+        
 
 def get_stop(stop_id):
     # Both keys are known, so ask for exactly this stop's row (no scan)
@@ -289,22 +304,33 @@ def lambda_handler(event, context):
         if result is None:                                  # no such stop
             return respond(404, {"error": "not found"})
         return respond(200, result)
+    
+    # /stop -> get_stops()
+    elif len(parts) == 1 and parts[0] == "stops":
+        result = get_stops()
+        return respond(200, result)
 
     return respond(404, {"error": "not found"})             # path didn't match anything
     
 
 if __name__ == "__main__":
+    # --- data functions ---
     print(get_route("5807"))
     print(get_route_day("5807", "2026-10-21"))
     print(get_route_day("5807", "2020-01-01"))   # no data -> None
     print(get_home())
     print(get_leaderboard())
-    print(get_stop("1001"))                     
+    print(get_stop("1001"))
     print(get_stop("0"))                         # not a stop -> None
+    print(len(get_stops()))                      # ~2,350 stops
+    print(get_stops()[:3])                       # first 3: [{"stop_id": ..., "name": ...}, ...]
+
+    # --- lambda_handler (fake API Gateway events) ---
     print(lambda_handler({"path": "/home"}, None))
     print(lambda_handler({"path": "/leaderboard"}, None))
     print(lambda_handler({"path": "/routes/5807"}, None))
     print(lambda_handler({"path": "/routes/5807/days/2026-10-21"}, None))
     print(lambda_handler({"path": "/stops/1001"}, None))       # real stop id
     print(lambda_handler({"path": "/stops/0"}, None))          # → 404
+    print(lambda_handler({"path": "/stops"}, None)["statusCode"])   # → 200 (just the code; the body is huge)
     print(lambda_handler({"path": "/banana"}, None))           # → 404
