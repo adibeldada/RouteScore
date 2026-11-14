@@ -1,5 +1,7 @@
 const API = "https://p51ce7sse8.execute-api.ca-central-1.amazonaws.com/prod";   // my API's base URL
 
+// ===== REQUEST 1: GET /home =====
+// When the page loads: all of Hamilton's numbers → fills <section id="system">
 fetch(API + "/home")                                    // ask the API for /home
   .then(function (response) {                           // when the answer arrives
     return response.json();                             // envelope → object
@@ -8,11 +10,13 @@ fetch(API + "/home")                                    // ask the API for /home
     document.getElementById("system").textContent = `On time: ${data.on_time}% | late: ${data.late}% | early: ${data.early}% | total: ${data.total}`;   // replace "Loading..."
   });
 
-fetch(API + "/leaderboard")                             // ask the API for /home
+// ===== REQUEST 2: GET /leaderboard =====
+// When the page loads: every main route → fills the leaderboard table AND the route dropdown
+fetch(API + "/leaderboard")                             // ask the API for /leaderboard
   .then(function (response) {                           // when the answer arrives
     return response.json();                             // envelope → object
   })
-  .then(function (data) {                              
+  .then(function (data) {
     const list = document.getElementById("leaderboard");
     const picker = document.getElementById("route-picker");
     list.innerHTML = ""
@@ -27,7 +31,7 @@ fetch(API + "/leaderboard")                             // ask the API for /home
         <td>${route.early}%</td>
         <td>${route.total.toLocaleString()}</td>
       </tr>`;
-      picker.innerHTML += `<option value="${route.route_id}">${route.name}</option>`; 
+      picker.innerHTML += `<option value="${route.route_id}">${route.name}</option>`;
       rank += 1;
     }
   } )
@@ -39,7 +43,8 @@ function hourLabel(hour) {
   return `${h % 12 || 12}${suffix}`;                // 17 → 5, 0 → 12
 }
 
-// When a route is picked from the dropdown, show its hour-by-hour numbers
+// ===== REQUEST 3: GET /routes/<id> =====
+// When a route is picked from the dropdown: that route's hour-by-hour numbers → fills the hours table
 document.getElementById("route-picker").addEventListener("change", function (event) {
   const routeId = event.target.value;                // picked option's value, e.g. "5828"
   const hoursTable = document.getElementById("route-hours");
@@ -67,3 +72,27 @@ document.getElementById("route-picker").addEventListener("change", function (eve
       }
     });
 });
+
+// ===== REQUEST 4: GET /stops =====
+// When the page loads: every stop's id + name → fills <datalist id="stop-list"> (search suggestions)
+fetch(API + "/stops")
+  .then(function (response) {
+    return response.json();                             // envelope → object
+  })
+  .then(function (data) {                               // data = [{stop_id, name}, ...] (~2,353 stops)
+    const datalist = document.getElementById("stop-list");
+
+    for (const stop of data){
+      datalist.innerHTML += `<option value="${stop.stop_id} – ${stop.name}">`;
+    }
+
+  });
+
+  // ===== Stop picked: show its numbers =====
+document.getElementById("stop-input").addEventListener("change", function (event) {
+  console.log(event.target.value);       // for now: just check what got picked
+
+  fetch(API + "/stops/" + stopId)
+
+});
+

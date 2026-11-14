@@ -82,7 +82,7 @@ Known issues, STATUS: ✅ **Fixed**
 - [x] Route picker with hour-by-hour reliability table
 - [ ] Hour-by-hour chart (Chart.js)
 - [ ] Day picker: how a route did on a specific day
-- [ ] Stop lookup: how reliable is my stop?
+- [x] Stop lookup: how reliable is my stop?
 - [ ] Deploy frontend (S3 + CloudFront)
 
 ### v0.5: Quality
