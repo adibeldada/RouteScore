@@ -20,3 +20,7 @@ th:nth-child(2), td:nth-child(2) {
 #stop-result { margin-top: 12px; }
 
 #day-result { margin-top: 12px; }
+
+canvas { display: block; }
+
+#chart-box { max-width: 800px; margin: 16px 0; }

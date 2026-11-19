@@ -82,7 +82,7 @@ Known issues, STATUS: ✅ **Fixed**
 - [x] Route picker with hour-by-hour reliability table
 - [x] Stop search with autocomplete (all 2,353 stops)
 - [x] Stop lookup: show a picked stop's on-time numbers
-- [ ] Hour-by-hour chart (Chart.js)
+- [x] Hour-by-hour chart (Chart.js)
 - [x] Day picker: how a route did on a specific day
 - [ ] Deploy frontend (S3 + CloudFront, HTTPS)
 

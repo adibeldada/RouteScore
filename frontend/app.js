@@ -1,5 +1,6 @@
 const API = "https://p51ce7sse8.execute-api.ca-central-1.amazonaws.com/prod";   // my API's base URL
 
+
 // ===== REQUEST 1: GET /home =====
 // When the page loads: all of Hamilton's numbers → fills <section id="system">
 fetch(API + "/home")                                    // ask the API for /home
@@ -52,13 +53,19 @@ function hourLabel(hour) {
 }
 
 // ===== REQUEST 3: GET /routes/<id> =====
-// When a route is picked from the dropdown: that route's hour-by-hour numbers → fills the hours table
+// When a route is picked from the dropdown: that route's hour-by-hour numbers → fills the hours table + draws the chart
+let hourChart = null;                                // the current chart (null = none drawn yet)
+
 document.getElementById("route-picker").addEventListener("change", function (event) {
   const routeId = event.target.value;                // picked option's value, e.g. "5828"
   const hoursTable = document.getElementById("route-hours");
 
   if (routeId === "") {                              // picked "Pick a route" again → clear
     hoursTable.innerHTML = "";
+    if (hourChart !== null) {                        // remove the old chart too
+      hourChart.destroy();
+      hourChart = null;
+    }
     return;
   }
 
@@ -66,8 +73,12 @@ document.getElementById("route-picker").addEventListener("change", function (eve
     .then(function (response) {
       return response.json();                        // envelope → object
     })
-    .then(function (data) {                          // data = {route_id, name, overall, hours: [...]}
+        .then(function (data) {                          // data = {route_id, name, overall, hours: [...]}
       hoursTable.innerHTML = "";                     // clear the last route's hours
+
+      const labels = [];                             // x-axis: "6am", "7am", ...
+      const lateValues = [];                         // late % per hour
+      const earlyValues = [];                        // early % per hour
 
       for (const hour of data.hours) {               // one row per hour
         hoursTable.innerHTML += `<tr>
@@ -77,7 +88,37 @@ document.getElementById("route-picker").addEventListener("change", function (eve
           <td>${hour.early}%</td>
           <td>${hour.total.toLocaleString()}</td>
         </tr>`;
+
+        if (hour.total < 100) continue;              // too few buses → % is noisy, leave it off the chart
+
+        labels.push(hourLabel(hour.hour));
+        lateValues.push(hour.late);
+        earlyValues.push(hour.early);
       }
+
+      if (hourChart !== null) {                      // a chart is already drawn → delete it first
+        hourChart.destroy();
+      }
+
+      hourChart = new Chart(document.getElementById("hour-chart"), {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: [
+            { label: "Late %",  data: lateValues,  backgroundColor: "#d9534f" },   // red
+            { label: "Early %", data: earlyValues, backgroundColor: "#f0ad4e" }    // amber
+          ]
+        },
+        options: {
+          plugins: {
+            title: { display: true, text: `${data.name}: off schedule by hour` }
+          },
+          scales: {
+            x: { stacked: true },
+            y: { stacked: true, beginAtZero: true, title: { display: true, text: "% of arrivals" } }
+          }
+        }
+      });
     });
 });
 
