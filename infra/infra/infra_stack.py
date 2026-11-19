@@ -1,14 +1,18 @@
 from aws_cdk import (
     BundlingOptions,                 # how to package src/ (pip install inside a Lambda-like Docker container)
-    CfnOutput,                       # print a value (the API URL) after cdk deploy
+    CfnOutput,                       # print a value (the API URL, the site URL) after cdk deploy
     Duration,                        # time values: Duration.seconds(10), Duration.minutes(5), Duration.days(90)
+    RemovalPolicy,                   # what happens to a resource when the stack is deleted (keep or destroy)
     Stack,                           # the base class InfraStack builds on (one deployable group of AWS resources)
     aws_lambda as _lambda,           # Lambda functions (fetch, process, api) + their code and runtime
     aws_events as events,            # EventBridge rules: the timers (every minute, every hour)
     aws_events_targets as targets,   # what a rule runs: targets.LambdaFunction(fetch_fn)
-    aws_s3 as s3,                    # S3 bucket for raw/ and arrivals/
+    aws_s3 as s3,                    # S3 buckets: data (raw/, arrivals/) and the website files
     aws_dynamodb as dynamodb,        # DynamoDB stats table
     aws_apigateway as apigateway,    # API Gateway: gives api_fn a URL
+    aws_cloudfront as cloudfront,             # CloudFront: serves the site over HTTPS + caches it worldwide
+    aws_cloudfront_origins as origins,        # tells CloudFront where the files come from (my S3 bucket)
+    aws_s3_deployment as s3deploy,            # uploads my frontend/ folder into the bucket on every cdk deploy
 )
 from constructs import Construct     # the type for "scope": every CDK piece is a Construct
 
@@ -19,8 +23,8 @@ class InfraStack(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         # --- STORAGE ---
-        # S3 bucket: raw/ = every minute's feed, arrivals/ = every hour's results.
-        # Files are auto-deleted after 90 days to keep costs down.
+        # Data bucket: raw/ = every minute's feed, arrivals/ = every hour's results.
+        # raw/ files are auto-deleted after 90 days to keep costs down.
         bucket = s3.Bucket(
             self, "RawFeedBucket",
             lifecycle_rules=[
@@ -28,16 +32,25 @@ class InfraStack(Stack):
             ],
         )
 
+        # Stats table: running on-time totals by route, stop, hour and day.
         table = dynamodb.Table(
             self, "StatsTableV3",
             partition_key = dynamodb.Attribute(name="pk", type=dynamodb.AttributeType.STRING),
             sort_key = dynamodb.Attribute(name="sk", type=dynamodb.AttributeType.STRING),
-            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST, 
+            billing_mode=dynamodb.BillingMode.PAY_PER_REQUEST,
+        )
 
+        # Site bucket: holds the website files (index.html, app.js, style.css).
+        # Separate from the data bucket so the site deploy can never touch raw/ or arrivals/.
+        site_bucket = s3.Bucket(
+            self, "SiteBucket",
+            block_public_access=s3.BlockPublicAccess.BLOCK_ALL,   # nobody can read the bucket directly, only CloudFront
+            removal_policy=RemovalPolicy.DESTROY,                 # if I delete the stack, delete this bucket too
+            auto_delete_objects=True,                             # empty it first (AWS won't delete a bucket that has files)
         )
 
         # --- THE CODE (shared) ---
-        # Both Lambdas run code from the same src/ folder, so package it once.
+        # All three Lambdas run code from the same src/ folder, so package it once.
         # Installs src/requirements.txt inside a Lambda-like Docker container.
         code = _lambda.Code.from_asset(
             "../src",
@@ -68,7 +81,7 @@ class InfraStack(Stack):
         bucket.grant_put(fetch_fn)
 
         # Timer: call the fetch Lambda every 1 minute.
-        # This is EventBridge 1 (targets.lambdaFunciton(fetch_fn)) is what runs it every minute
+        # This is EventBridge 1 (targets.LambdaFunction(fetch_fn)) is what runs it every minute
         rule = events.Rule(
             self, "EveryMinute",
             schedule=events.Schedule.rate(Duration.minutes(1)),
@@ -98,14 +111,15 @@ class InfraStack(Stack):
 
         # Timer: call the process Lambda at 5 minutes past every hour
         # (gives the last snapshot of the previous hour time to land first).
-        # This is EventBridge 2 (targets.lambdaFunciton(process_fn)) is what runs it every hour
+        # This is EventBridge 2 (targets.LambdaFunction(process_fn)) is what runs it every hour
         hourly_rule = events.Rule(
             self, "EveryHour",
             schedule=events.Schedule.cron(minute="5"),
             targets=[targets.LambdaFunction(process_fn)],
         )
 
-        # --- LAMBDA 3 ---
+        # --- LAMBDA 3: API ---
+        # Runs src/api.py: answers website requests by reading the stats table.
         api_fn = _lambda.Function(
             self, "ApiFunction",
             runtime=_lambda.Runtime.PYTHON_3_13,
@@ -132,5 +146,27 @@ class InfraStack(Stack):
             ),
         )
 
-        # Print the API's URL after cdk deploy
-        CfnOutput(self, "ApiUrl", value=api.url)
+        # --- WEBSITE (CloudFront in front of site_bucket) ---
+        # CloudFront gives the site an HTTPS link and caches it; only it can read site_bucket.
+        distribution = cloudfront.Distribution(
+            self, "SiteDistribution",
+            default_behavior=cloudfront.BehaviorOptions(                                   # how CloudFront handles every request
+                origin=origins.S3BucketOrigin.with_origin_access_control(site_bucket),    # get files from site_bucket (only CloudFront may read it)
+                viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,  # http:// → https://
+            ),
+            default_root_object="index.html",                                              # bare link opens index.html
+        )
+
+        # Upload frontend/ into site_bucket on every cdk deploy, then clear CloudFront's cache.
+        s3deploy.BucketDeployment(
+            self, "DeploySite",
+            sources=[s3deploy.Source.asset("../frontend")],   # what to upload: my frontend/ folder
+            destination_bucket=site_bucket,                   # where it goes
+            distribution=distribution,                        # after uploading, clear CloudFront's cache...
+            distribution_paths=["/*"],                        # ...for every file, so changes show up right away
+        )
+
+        # --- OUTPUTS ---
+        # Printed after cdk deploy.
+        CfnOutput(self, "ApiUrl", value=api.url)                                            # the API's URL
+        CfnOutput(self, "SiteUrl", value="https://" + distribution.distribution_domain_name) # the website's URL

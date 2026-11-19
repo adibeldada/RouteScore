@@ -84,7 +84,7 @@ Known issues, STATUS: ✅ **Fixed**
 - [x] Stop lookup: show a picked stop's on-time numbers
 - [x] Hour-by-hour chart (Chart.js)
 - [x] Day picker: how a route did on a specific day
-- [ ] Deploy frontend (S3 + CloudFront, HTTPS)
+- [x] Deploy frontend (S3 + CloudFront, HTTPS)
 
 ### v0.5: Trends over time
 - [ ] Monthly totals per route (`ROUTE#id / MONTH#YYYY-MM`)
