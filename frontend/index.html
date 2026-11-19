@@ -48,10 +48,20 @@
 
   <!-- Stop lookup: filled by app.js -->
   <h2>How reliable is my stop?</h2>
+  
   <input id="stop-input" list="stop-list" placeholder="Type a stop name...">
     <datalist id="stop-list"></datalist>  <!-- JS fills this with every stop -->
-  
+ 
   <section id="stop-result"></section>  
+
+  <!-- Route Day: filled by app.js -->
+  <h2>Route by day</h2>
+  <select id="day-route-picker">
+    <option value="">Pick a route</option>   <!-- placeholder option -->
+  </select>
+  <input type="date" id="day-picker">
+  <section id="day-result"></section>
+
 
   <script src="app.js"></script>             <!-- last, so the elements above exist first -->
 

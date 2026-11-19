@@ -7,7 +7,13 @@ fetch(API + "/home")                                    // ask the API for /home
     return response.json();                             // envelope → object
   })
   .then(function (data) {                               // data = {on_time, late, early, total}
-    document.getElementById("system").textContent = `On time: ${data.on_time}% | late: ${data.late}% | early: ${data.early}% | total: ${data.total}`;   // replace "Loading..."
+    const system = document.getElementById("system");   // where the answer goes
+    const on_time_prc = data.on_time;
+    const late_prc = data.late;
+    const early_prc = data.early;
+    const total = data.total;
+
+    system.textContent = `On time: ${on_time_prc}% | late: ${late_prc}% | early: ${early_prc}% | total: ${total.toLocaleString()}`;   // replace "Loading..."
   });
 
 // ===== REQUEST 2: GET /leaderboard =====
@@ -19,6 +25,7 @@ fetch(API + "/leaderboard")                             // ask the API for /lead
   .then(function (data) {
     const list = document.getElementById("leaderboard");
     const picker = document.getElementById("route-picker");
+    const dayPicker = document.getElementById("day-route-picker");
     list.innerHTML = ""
     let rank = 1;
 
@@ -32,6 +39,7 @@ fetch(API + "/leaderboard")                             // ask the API for /lead
         <td>${route.total.toLocaleString()}</td>
       </tr>`;
       picker.innerHTML += `<option value="${route.route_id}">${route.name}</option>`;
+      dayPicker.innerHTML += `<option value="${route.route_id}">${route.name}</option>`;
       rank += 1;
     }
   } )
@@ -90,9 +98,64 @@ fetch(API + "/stops")
 
   // ===== Stop picked: show its numbers =====
 document.getElementById("stop-input").addEventListener("change", function (event) {
-  console.log(event.target.value);       // for now: just check what got picked
+  const result = document.getElementById("stop-result");
+  const stopId = event.target.value.split(" – ")[0];
 
   fetch(API + "/stops/" + stopId)
-
+    .then(function (response) {
+      if (!response.ok) {
+        result.textContent = "Stop not found.";
+        return null;
+      }
+      return response.json();                        // envelope → object
+    })
+    .then(function (data) {
+      if (data === null) return;
+      
+      const stop_id = data.stop_id;
+      const stop_name = data.name;
+      const on_time_prc = data.on_time;
+      const late_prc = data.late;
+      const early_prc = data.early;
+      const total = data.total;
+        
+      result.textContent = `${stop_id} – ${stop_name}: on time ${on_time_prc}% | late ${late_prc}% | early ${early_prc}% | ${total.toLocaleString()} arrivals`;
+    });
 });
+
+// ===== REQUEST 6: GET /routes/<id>/days/<day> =====
+// When the route OR the date changes: that route's numbers on that day → fills <section id="day-result">
+function loadDay() {
+  const result = document.getElementById("day-result");                    // where the answer goes
+  const routeId = document.getElementById("day-route-picker").value;       // e.g. "5782"
+  const date = document.getElementById("day-picker").value;                // e.g. "2026-11-18"
+
+  if (routeId === "" || date === "") {                                      // one of them not picked yet
+    result.textContent = "Pick a route and a day.";
+    return;
+  }
+
+  fetch(API + "/routes/" + routeId + "/days/" + date)
+    .then(function (response) {
+      if (!response.ok) {                                                   // 404 = no data that day
+        result.textContent = "No data for that day.";
+        return null;
+      }
+      return response.json();                                               // envelope → object
+    })
+    .then(function (data) {
+      if (data === null) return;                                            // already showed the error
+
+      const route_name = data.name;
+      const on_time_prc = data.on_time;
+      const late_prc = data.late;
+      const early_prc = data.early;
+      const total = data.total;
+
+      result.textContent = `${route_name} on ${date}: on time ${on_time_prc}% | late ${late_prc}% | early ${early_prc}% | ${total.toLocaleString()} arrivals`;
+    });
+}
+
+document.getElementById("day-route-picker").addEventListener("change", loadDay);   // route changed → reload
+document.getElementById("day-picker").addEventListener("change", loadDay);         // date changed → reload
 

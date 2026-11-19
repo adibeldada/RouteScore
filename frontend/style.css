@@ -16,3 +16,7 @@ th, td {
 th:nth-child(2), td:nth-child(2) {
   text-align: left;          /* except the Route column */
 }
+
+#stop-result { margin-top: 12px; }
+
+#day-result { margin-top: 12px; }

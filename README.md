@@ -68,7 +68,7 @@ Not affiliated with the City of Hamilton or the HSR.
 - [x] On-time % by hour of day (e.g. rush hour vs. evening)
 - [x] Daily summaries so stats build up over time
 - [x] Store on-time % totals in DynamoDB
-- [x]  Skip arrivals with no scheduled time (placeholder zero times)
+- [x] Skip arrivals with no scheduled time (placeholder zero times)
 
 Known issues, STATUS: ✅ **Fixed**
 - Arrivals with no scheduled time (`scheduled_time = 0`) are counted as on time, which inflates on-time %
@@ -80,37 +80,45 @@ Known issues, STATUS: ✅ **Fixed**
 - [x] Route and stop names in the API (from routes.txt / stops.txt)
 - [x] Route leaderboard: most and least reliable routes
 - [x] Route picker with hour-by-hour reliability table
+- [x] Stop search with autocomplete (all 2,353 stops)
+- [x] Stop lookup: show a picked stop's on-time numbers
 - [ ] Hour-by-hour chart (Chart.js)
-- [ ] Day picker: how a route did on a specific day
-- [x] Stop lookup: how reliable is my stop?
-- [ ] Deploy frontend (S3 + CloudFront)
+- [x] Day picker: how a route did on a specific day
+- [ ] Deploy frontend (S3 + CloudFront, HTTPS)
 
-### v0.5: Quality
+### v0.5: Trends over time
+- [ ] Monthly totals per route (`ROUTE#id / MONTH#YYYY-MM`)
+- [ ] Monthly rush-hour totals per route (`ROUTE#id / MONTH#YYYY-MM#HOUR#HH`)
+- [ ] Rebuild past months from saved arrivals (backfill)
+- [ ] API: route stats for a chosen month
+- [ ] Dashboard: month picker and month-vs-month comparison (e.g. fall vs. winter rush hour)
+
+### v0.6: Quality
 - [ ] Unit tests (pytest) for delay and stats logic
 - [ ] AWS tests with mocked services (moto)
 - [ ] GitHub Actions CI
 - [ ] Automatic deployment with AWS CDK
 
-### v0.6: Ghost buses
+### v0.7: Ghost buses
 - [ ] Load scheduled trips from the static schedule (stop_times.txt, trips.txt)
 - [ ] Detect scheduled trips that never appeared
 - [ ] Ghost bus count per route on the dashboard
 
-### v0.7: Alerts
+### v0.8: Alerts
 - [ ] Subscribe to a route or stop by email
 - [ ] Get alerted when your bus is running late or cancelled (SNS)
 
-### v0.8: Fault tolerance
+### v0.9: Fault tolerance
 - [ ] Queue between fetching and processing (SQS), so one failing doesn't break the other
 - [ ] Retry failed processing and capture bad data (dead-letter queue)
+- [ ] Make hourly processing retry-safe (no double counting if a run is retried)
 - [ ] Detect feed outages and mark gaps clearly instead of skewing stats
 - [ ] Handle known feed quirks: duplicate trips, placeholder zero offsets
 - [ ] Catch arrivals that happen in the last minute of an hour (load the previous hour's last snapshot)
 
-### v0.9: Rider experience
+### v0.10: Rider experience
 - [ ] Mobile-friendly dashboard
 - [ ] Live map of buses
-- [ ] HTTPS and faster loading (CloudFront)
 - [ ] Compare with the city's official on-time numbers
 
 ### v1.0: Stable release
@@ -122,5 +130,6 @@ Known issues, STATUS: ✅ **Fixed**
 ### Future ideas
 - [ ] Auto-download the latest static schedule daily (Lambda + S3)
 - [ ] Delay prediction from historical data
-- [ ] Weather impact on delays
+- [ ] Weather impact on delays (needs v0.5 monthly data)
 - [ ] Weekly reliability report by email
+- [ ] "Get there on time": which bus to take to arrive on time 95% of the time
