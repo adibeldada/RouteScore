@@ -74,7 +74,7 @@ Known issues, STATUS: ✅ **Fixed**
 - Arrivals with no scheduled time (`scheduled_time = 0`) are counted as on time, which inflates on-time %
 - Stats start from Oct 21; backfill of saved arrivals since Oct 15 still to do
 
-### v0.4: Public dashboard
+### ✅ v0.4: Public dashboard
 - [x] API backend (api.py): route, day, home, leaderboard, stop lookups + request routing
 - [x] Deploy API (Lambda + API Gateway, CDK)
 - [x] Route and stop names in the API (from routes.txt / stops.txt)
