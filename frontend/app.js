@@ -46,15 +46,27 @@ fetch(API + "/leaderboard")                             // ask the API for /lead
   } )
 
 // Turn "08" into "8am", "17" into "5pm", "00" into "12am"
+// Turn an hour into a range: "15" → "3–4pm", "11" → "11am–12pm", "23" → "11pm–12am"
 function hourLabel(hour) {
-  const h = parseInt(hour);                          // "08" → 8 (text → number)
-  const suffix = h < 12 ? "am" : "pm";              // before noon = am
-  return `${h % 12 || 12}${suffix}`;                // 17 → 5, 0 → 12
+  const start = parseInt(hour);                        // "15" → 15 (text → number)
+  const end = (start + 1) % 24;                        // next hour; 23 → 0 (wraps to midnight)
+
+  const startSuffix = start < 12 ? "am" : "pm";        // am or pm for each
+  const endSuffix = end < 12 ? "am" : "pm";
+
+  const startNum = start % 12 || 12;                   // 24h → 12h: 15 → 3, 0 → 12
+  const endNum = end % 12 || 12;
+
+  if (startSuffix === endSuffix) {
+    return `${startNum}–${endNum}${endSuffix}`;        // same half of day: "3–4pm"
+  }
+  return `${startNum}${startSuffix}–${endNum}${endSuffix}`;   // crosses noon/midnight: "11am–12pm"
 }
 
 // ===== REQUEST 3: GET /routes/<id> =====
 // When a route is picked from the dropdown: that route's hour-by-hour numbers → fills the hours table + draws the chart
 let hourChart = null;                                // the current chart (null = none drawn yet)
+let onTimeChart = null; 
 
 document.getElementById("route-picker").addEventListener("change", function (event) {
   const routeId = event.target.value;                // picked option's value, e.g. "5828"
@@ -66,6 +78,11 @@ document.getElementById("route-picker").addEventListener("change", function (eve
       hourChart.destroy();
       hourChart = null;
     }
+    if (onTimeChart !== null) {                        // remove the old chart too
+      onTimeChart.destroy();
+      onTimeChart = null;
+    }
+    for (const box of document.querySelectorAll(".chart-box")) box.hidden = true;   // hide the charts again
     return;
   }
 
@@ -79,6 +96,7 @@ document.getElementById("route-picker").addEventListener("change", function (eve
       const labels = [];                             // x-axis: "6am", "7am", ...
       const lateValues = [];                         // late % per hour
       const earlyValues = [];                        // early % per hour
+      const onTimeValues = [];    
 
       for (const hour of data.hours) {               // one row per hour
         hoursTable.innerHTML += `<tr>
@@ -94,12 +112,17 @@ document.getElementById("route-picker").addEventListener("change", function (eve
         labels.push(hourLabel(hour.hour));
         lateValues.push(hour.late);
         earlyValues.push(hour.early);
+        onTimeValues.push(hour.on_time);
       }
 
-      if (hourChart !== null) {                      // a chart is already drawn → delete it first
+            if (hourChart !== null) {                      // a chart is already drawn → delete it first
         hourChart.destroy();
       }
+      if (onTimeChart !== null) {                    // same for the on-time chart
+        onTimeChart.destroy();
+      }
 
+      // Chart 1: late + early, stacked
       hourChart = new Chart(document.getElementById("hour-chart"), {
         type: "bar",
         data: {
@@ -119,8 +142,28 @@ document.getElementById("route-picker").addEventListener("change", function (eve
           }
         }
       });
-    });
-});
+
+      // Chart 2: on time
+      onTimeChart = new Chart(document.getElementById("on-time-chart"), {
+        type: "bar",
+        data: {
+          labels: labels,
+          datasets: [
+            { label: "On time %", data: onTimeValues, backgroundColor: "#2681dd" }   // blue
+          ]
+        },
+        options: {
+          plugins: {
+            title: { display: true, text: `${data.name}: on time by hour` }
+          },
+          scales: {
+            y: { beginAtZero: true, max: 100, title: { display: true, text: "% of arrivals" } }
+          }
+        }
+      });
+      for (const box of document.querySelectorAll(".chart-box")) box.hidden = false;
+    });   // closes .then
+});       // closes the listener
 
 // ===== REQUEST 4: GET /stops =====
 // When the page loads: every stop's id + name → fills <datalist id="stop-list"> (search suggestions)

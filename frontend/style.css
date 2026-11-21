@@ -23,6 +23,6 @@ th:nth-child(2), td:nth-child(2) {
 
 canvas { display: block; }
 
-#chart-box { max-width: 800px; margin: 16px 0; }
+.chart-box { max-width: 800px; margin: 16px 0; }
 
 footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid #ddd; color: #666; font-size: 14px; }
