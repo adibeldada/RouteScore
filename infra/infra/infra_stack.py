@@ -13,6 +13,7 @@ from aws_cdk import (
     aws_cloudfront as cloudfront,             # CloudFront: serves the site over HTTPS + caches it worldwide
     aws_cloudfront_origins as origins,        # tells CloudFront where the files come from (my S3 bucket)
     aws_s3_deployment as s3deploy,            # uploads my frontend/ folder into the bucket on every cdk deploy
+    aws_certificatemanager as acm,        # ACM: the HTTPS certificate for routescore.adibeldada.com
 )
 from constructs import Construct     # the type for "scope": every CDK piece is a Construct
 
@@ -146,6 +147,12 @@ class InfraStack(Stack):
             ),
         )
 
+        # HTTPS certificate for routescore.adibeldada.com (made in the console, in us-east-1 because CloudFront needs that)
+        site_cert = acm.Certificate.from_certificate_arn(
+            self, "SiteCert",
+            "arn:aws:acm:us-east-1:975903044518:certificate/91b55468-7fe1-45b7-be0c-d179a8ad5d3e",
+        )
+
         # --- WEBSITE (CloudFront in front of site_bucket) ---
         # CloudFront gives the site an HTTPS link and caches it; only it can read site_bucket.
         distribution = cloudfront.Distribution(
@@ -154,8 +161,10 @@ class InfraStack(Stack):
                 origin=origins.S3BucketOrigin.with_origin_access_control(site_bucket),    # get files from site_bucket (only CloudFront may read it)
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,  # http:// → https://
             ),
-            default_root_object="index.html",                                              # bare link opens index.html
-        )
+            default_root_object="index.html",              # bare link opens index.html
+            domain_names=["routescore.adibeldada.com"],    # my own address for the site
+            certificate=site_cert,                         # proves to browsers that it's really mine (HTTPS)
+         )
 
         # Upload frontend/ into site_bucket on every cdk deploy, then clear CloudFront's cache.
         s3deploy.BucketDeployment(
@@ -170,3 +179,4 @@ class InfraStack(Stack):
         # Printed after cdk deploy.
         CfnOutput(self, "ApiUrl", value=api.url)                                            # the API's URL
         CfnOutput(self, "SiteUrl", value="https://" + distribution.distribution_domain_name) # the website's URL
+        
