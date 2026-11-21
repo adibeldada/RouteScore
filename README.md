@@ -2,6 +2,8 @@ Status: IN PROGRESS
 
 # RouteScore
 
+**Live demo:** https://d3kup2ob91zihg.cloudfront.net
+
 ## Overview
 RouteScore tracks how reliable Hamilton's HSR buses really are. Every minute, it collects live bus data from the City of Hamilton and compares where buses actually are against where the schedule says they should be. Over time, it builds a reliability history for every route, stop, and hour of the day, so riders can see things like "Route 51 is late 38% of the time between 8 and 9am." It also catches "ghost buses," trips that were scheduled but never showed up, and alerts riders when their usual bus is running badly.
 
